@@ -164,6 +164,10 @@ jobs:
               body = base64.b64decode(rules['content']).decode()
               print('UPSTREAM_ADVISORY', head_main,
                     re.findall(r'--max-filesize ([0-9]+)', body), flush=True)
+              merged=api('search/issues?' + urlencode({'per_page':100, 'q':'repo:' + UPSTREAM + ' is:pr is:merged author:0xshuzo'}))
+              require(not merged['incomplete_results'], 'Account merge search incomplete')
+              print('ACCOUNT_MERGES', json.dumps({'total': merged['total_count'], 'prs':
+                    [{'number':p['number'],'title':p['title'],'closed_at':p['closed_at']} for p in merged['items'][:40]]}), flush=True)
               for number in numbers:
                   pr = api(UPSTREAM_API + 'pulls/' + str(number))
                   require(pr['base']['repo']['id'] == UPSTREAM_ID and pr['user']['login'] == '0xshuzo',
