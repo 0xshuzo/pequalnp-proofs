@@ -1,0 +1,46 @@
+name: Lean proof diagnostics
+on:
+  push:
+    branches:
+      - pnp/diag-l-meta-3322-1795524731
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      BASE_SHA: f9ec2ea4d819ab76a194f47236d543a3070b3cff
+      PROOF_SHA: 16668b2f6e856ca199eb2c94a34a1e1b3bb5f249
+      MODULE: PEqualNP.Outside.L_meta_3322
+      BLOB_SHA: d32413e77c8f4fec81429afa8bc748563c24985e
+      PROOF_FILE: lean/PEqualNP/Outside/L_meta_3322.lean
+    steps:
+      - name: Fetch the pinned proof commit
+        run: |
+          set -eu
+          git init -q .
+          git fetch -q --no-tags --depth 2 https://github.com/0xshuzo/pequalnp-proofs.git "$PROOF_SHA"
+          git checkout -q --detach FETCH_HEAD
+          test "$(git rev-parse HEAD)" = "$PROOF_SHA"
+          test "$(git rev-parse HEAD^1)" = "$BASE_SHA"
+          test "$(git hash-object "$PROOF_FILE")" = "$BLOB_SHA"
+          test "$(git diff --name-only HEAD^1 HEAD)" = "$PROOF_FILE"
+      - name: Install the project's Lean toolchain
+        run: |
+          set -eu
+          curl -fsSL https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh | sh -s -- -y --default-toolchain none
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+          "$HOME/.elan/bin/elan" toolchain install "$(cat lean/lean-toolchain)"
+      - name: Fetch pinned Mathlib cache
+        working-directory: lean
+        run: lake exe cache get
+      - name: Compile the assigned module with full diagnostics
+        working-directory: lean
+        run: |
+          set -eu
+          marker="lean-$(cat /proc/sys/kernel/random/uuid)"
+          echo "::stop-commands::$marker"
+          if lake build "+$MODULE"; then status=0; else status=$?; fi
+          echo "::$marker::"
+          exit "$status"
