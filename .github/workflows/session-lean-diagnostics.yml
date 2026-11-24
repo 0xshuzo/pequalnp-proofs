@@ -11,9 +11,9 @@ jobs:
     timeout-minutes: 25
     env:
       BASE_SHA: f9ec2ea4d819ab76a194f47236d543a3070b3cff
-      PROOF_SHA: 06890986099e5fef86a71723b5810d8648172ecd
+      PROOF_SHA: be5a1ae52625d17c8623b31f446f2e6ee04bc97a
       MODULE: PEqualNP.Outside.L_meta_2309
-      BLOB_SHA: 8ba3540b7758b08b7c2e85199a9114bb43502942
+      BLOB_SHA: ad9dfefc88f1d77103688754b2254e12fc94233f
       PROOF_FILE: lean/PEqualNP/Outside/L_meta_2309.lean
     steps:
       - name: Fetch the pinned proof commit
