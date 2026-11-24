@@ -1,0 +1,210 @@
+name: Personal proof submission
+on:
+  push:
+    branches: [pnp-upstream-submit]
+permissions: {}
+concurrency:
+  group: pnp-personal-upstream
+  cancel-in-progress: false
+jobs:
+  submit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    environment: pnp-upstream
+    steps:
+      - name: Verify personal account and process the pinned proof
+        env:
+          PNP_PERSONAL_CREDENTIAL: ${{ secrets.PNP_UPSTREAM_TOKEN }}
+        shell: python
+        run: |
+          """Run on the dedicated fork branch, without checking out PR or proof code."""
+          import base64
+          import hashlib
+          import json
+          import os
+          import re
+          import subprocess
+          import sys
+          import tempfile
+          import time
+          from pathlib import Path
+          from urllib.parse import quote, urlencode
+          from urllib.request import urlopen
+          
+          FORK = '0xshuzo/pequalnp-proofs'
+          UPSTREAM = 'open-goat/pequalnp-proofs'
+          UPSTREAM_ID = 1468025030
+          FORK_API = 'repos/' + FORK + '/'
+          UPSTREAM_API = 'repos/' + UPSTREAM + '/'
+          HELD = {'L-meta-3128', 'L-meta-3055', 'L-meta-3154', 'L-meta-3186'}
+          
+          
+          def require(condition, message):
+              if not condition:
+                  raise SystemExit(message)
+          
+          
+          def gh(*args, check=True):
+              return subprocess.run(['gh', *args], env=gh_env, text=True, check=check,
+                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=90)
+          
+          
+          def api(path):
+              result = gh('api', '--hostname', 'github.com', path, check=False)
+              require(result.returncode == 0, result.stderr.strip() or 'GitHub API failed')
+              return json.loads(result.stdout)
+          
+          
+          def public(url):
+              with urlopen(url, timeout=30) as response:
+                  body = response.read(16000001)
+              require(len(body) <= 16000000, 'Project response exceeds expected size')
+              return body
+          
+          
+          def current_prs(c):
+              branch = api(UPSTREAM_API + 'pulls?' + urlencode({
+                  'state': 'all', 'per_page': 100, 'head': '0xshuzo:' + c['branch']}))
+              result = api('search/issues?' + urlencode({
+                  'per_page': 100, 'q': 'repo:' + UPSTREAM + ' is:pr in:title "' + c['task'] + '"'}))
+              require(not result['incomplete_results'] and result['total_count'] <= 100,
+                      'Task PR search incomplete')
+              pattern = re.compile(r'(?<![a-z0-9])' + re.escape(c['task']) + r'(?![a-z0-9])', re.I)
+              related = [p for p in result['items'] if pattern.search(p['title'])]
+              print('Previous PRs for task:', [(p['number'], p['state']) for p in related], flush=True)
+              return branch, related
+          
+          
+          def confirm(c, rows):
+              hits = [p for p in rows if p['state'] == 'open' or p.get('merged_at')]
+              hits = [p for p in hits if p['head']['sha'] == c['sha'] and
+                      p['head']['ref'] == c['branch'] and p['head']['repo']['full_name'] == FORK and
+                      p['base']['repo']['id'] == UPSTREAM_ID and p['base']['ref'] == 'main' and
+                      p['title'] == c['task'] and p['user']['login'] == '0xshuzo']
+              if len(hits) == 1:
+                  print('VERIFIED_PR', c['task'], hits[0]['html_url'], c['sha'], flush=True)
+                  return True
+              return False
+          
+          
+          def verify_ci(c):
+              run = api(FORK_API + 'actions/runs/' + c['run'])
+              require(run['head_sha'] == c['ci_sha'] and run['status'] == 'completed' and
+                      run['conclusion'] == 'success', 'Fork checker run missing or changed')
+              jobs = api(FORK_API + 'actions/runs/' + c['run'] + '/jobs?filter=latest&per_page=100')
+              steps = {s['name'] for j in jobs['jobs'] if j['conclusion'] == 'success'
+                       for s in j['steps'] if s['conclusion'] == 'success' and
+                       s.get('started_at') and s.get('completed_at')}
+              if c['kind'] == 'check':
+                  require(run['event'] == 'pull_request' and run['path'] == '.github/workflows/advisory.yml'
+                          and run['head_sha'] == c['sha'] and 'Run the checker' in steps,
+                          'Advisory checker did not run successfully on proof head')
+                  return
+              workflow = '.github/workflows/session-reduction.yml'
+              require(run['event'] == 'push' and run['path'] == workflow and
+                      {'Fetch the pinned proof commit', 'Run the reduction checker'} <= steps,
+                      'Reduction checker steps did not pass')
+              source = api(FORK_API + 'contents/' + workflow + '?ref=' + c['ci_sha'])
+              lines = base64.b64decode(source['content']).decode().splitlines()
+              expected = {'PROOF_SHA: ' + c['sha'], 'BLOB_SHA: ' + c['blob'],
+                          'BASE_SHA: ' + c['base'], 'PROOF_FILE: ' + c['file']}
+              require(expected <= {s.strip() for s in lines}, 'Checker inputs differ from proof')
+              logs = gh('run', 'view', c['run'], '--repo', FORK, '--log')
+              require(any('Run the reduction checker' in line and 'ACCEPTED (reduce)' in line
+                          for line in logs.stdout.splitlines()), 'No reduction verdict in checker step')
+          
+          
+          def verify_desk(c):
+              listing = json.loads(public('https://data.pequalnp.com/data/desk/gaps.json'))
+              require(listing['repo'] == 'https://github.com/' + UPSTREAM, 'Project repository changed')
+              matches = [row for row in listing['gaps'] if row['id'] == c['task']]
+              require(len(matches) == 1, 'Task is no longer posted')
+              row = matches[0]
+              signature = json.dumps([row['statement'], row['imports'], row['file'], row['module']],
+                                     ensure_ascii=False, separators=(',', ':')).encode()
+              require(hashlib.sha256(signature).hexdigest() == c['statement'], 'Posted assignment changed')
+              if c['kind'] == 'reduce':
+                  active = [r for r in listing['reductions'] if r['parent'] == c['task'] and r['state'] == 'open']
+                  require(row.get('reductions') is True and listing['reductions_open'] and
+                          row.get('kind', 'check') == 'check' and len(active) < 3 and
+                          all(r.get('artifact', {}).get('lean_file') != c['file'] for r in active),
+                          'Reduction no longer eligible')
+              status = json.loads(public('https://pequalnp.com/desk/step?gap=' + c['task']))
+              require(status['state'] in ('open', 'leased'), 'Desk status: ' + str(status.get('state')))
+              require(time.time() < c['until'], 'Lease confirmation is stale; coordinator must renew')
+          
+          
+          def submit(c):
+              require(c['kind'] in ('check', 'reduce') and re.fullmatch(r'L-meta-[0-9]+', c['task'])
+                      and c['branch'] == 'pnp/' + c['task'].lower() + '-resume' and
+                      re.fullmatch(r'[0-9a-f]{40}', c['sha']), 'Unsupported candidate')
+              require('gh repo fork ' + UPSTREAM in public('https://pequalnp.com/join.txt').decode(),
+                      'Canonical upstream differs from current project instructions')
+              rows, related = current_prs(c)
+              if confirm(c, rows):
+                  return
+              require(not rows and not any(p['state'] == 'open' and p['user']['login'] == '0xshuzo'
+                                           for p in related), 'Own PR already exists')
+              require(c['task'] not in HELD or not any(p['state'] == 'open' for p in related),
+                      'Competing PR awaiting owner approval')
+              for other in related:
+                  if other['state'] == 'open':
+                      files = api(UPSTREAM_API + 'pulls/' + str(other['number']) + '/files')
+                      require(all(f['filename'] != c['file'] for f in files),
+                              'Another open PR already adds this file')
+              verify_ci(c)
+              main = api(UPSTREAM_API + 'commits/main')['sha']
+              compare = api(UPSTREAM_API + 'compare/main...' + quote('0xshuzo:' + c['branch'], safe=''))
+              require(compare['base_commit']['sha'] == main and compare['ahead_by'] == 1 and
+                      [p['sha'] for p in compare['commits']] == [c['sha']] and
+                      [p['sha'] for p in compare['commits'][0]['parents']] == [c['base']] and
+                      [(f['filename'], f['status'], f['sha']) for f in compare['files']] ==
+                      [(c['file'], 'added', c['blob'])], 'Upstream comparison changed')
+              verify_desk(c)
+              rows, related = current_prs(c)
+              if confirm(c, rows):
+                  return
+              require(not rows and not any(p['state'] == 'open' and p['user']['login'] == '0xshuzo'
+                                           for p in related), 'Own source or task PR already exists')
+              require(time.time() < c['until'], 'Lease confirmation expired')
+              cmd = gh('pr', 'create', '--repo', UPSTREAM, '--base', 'main', '--head',
+                       '0xshuzo:' + c['branch'], '--title', c['task'], '--body', '',
+                       '--no-maintainer-edit', check=False)
+              if cmd.returncode:
+                  print(cmd.stderr.rstrip(), flush=True)
+              rows, _ = current_prs(c)
+              require(confirm(c, rows), 'No confirmed upstream PR for the verified head')
+          
+          
+          def main():
+              global gh_env
+              require(os.getenv('GITHUB_REPOSITORY') == FORK and
+                      os.getenv('GITHUB_REF') == 'refs/heads/pnp-upstream-submit' and
+                      os.getenv('GITHUB_EVENT_NAME') == 'push', 'Unexpected workflow context')
+              token = os.environ.pop('PNP_PERSONAL_CREDENTIAL', '')
+              require(token, 'Environment secret PNP_UPSTREAM_TOKEN is missing')
+              gh_env = os.environ.copy()
+              for name in ['GH_TOKEN', 'GITHUB_TOKEN', 'GH_DEBUG', 'GH_ENTERPRISE_TOKEN']:
+                  gh_env.pop(name, None)
+              with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as auth:
+                  gh_env.update(GH_TOKEN=token, GH_CONFIG_DIR=auth, GH_HOST='github.com',
+                                GH_PROMPT_DISABLED='1', GH_NO_UPDATE_NOTIFIER='1')
+                  who = gh('api', '--hostname', 'github.com', 'user', '--jq', '.login', check=False)
+                  require(who.returncode == 0 and who.stdout.strip() == '0xshuzo', 'Personal login failed')
+                  headers = gh('api', '--hostname', 'github.com', '-i', 'user').stdout.split('\n\n',1)[0]
+                  scopes = next((v.partition(':')[2] for v in headers.splitlines()
+                                 if v.lower().startswith('x-oauth-scopes:')), '')
+                  require('public_repo' in {s.strip() for s in scopes.split(',')},
+                          'Personal public_repo scope unconfirmed')
+                  repo = api('repos/' + UPSTREAM)
+                  require(repo['full_name'] == UPSTREAM and repo['id'] == UPSTREAM_ID and
+                          repo['default_branch'] == 'main', 'Unexpected upstream')
+                  print('PERSONAL_LOGIN_CONFIRMED 0xshuzo', flush=True)
+                  if CANDIDATE:
+                      submit(CANDIDATE)
+          
+          
+          CANDIDATE = {}
+          
+          if __name__ == '__main__':
+              main()
