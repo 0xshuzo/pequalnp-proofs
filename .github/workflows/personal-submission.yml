@@ -152,6 +152,7 @@ jobs:
                       files = api(UPSTREAM_API + 'pulls/' + str(other['number']) + '/files')
                       require(all(f['filename'] != c['file'] for f in files),
                               'Another open PR already adds this file')
+              checked_competitors = {p['number'] for p in related if p['state'] == 'open'}
               verify_ci(c)
               main = api(UPSTREAM_API + 'commits/main')['sha']
               compare = api(UPSTREAM_API + 'compare/main...' + quote('0xshuzo:' + c['branch'], safe=''))
@@ -166,14 +167,24 @@ jobs:
                   return
               require(not rows and not any(p['state'] == 'open' and p['user']['login'] == '0xshuzo'
                                            for p in related), 'Own source or task PR already exists')
+              require({p['number'] for p in related if p['state'] == 'open'} == checked_competitors,
+                      'Competition changed during verification; recheck before submitting')
               require(time.time() < c['until'], 'Lease confirmation expired')
               cmd = gh('pr', 'create', '--repo', UPSTREAM, '--base', 'main', '--head',
                        '0xshuzo:' + c['branch'], '--title', c['task'], '--body', '',
                        '--no-maintainer-edit', check=False)
               if cmd.returncode:
                   print(cmd.stderr.rstrip(), flush=True)
+              if cmd.returncode == 0:
+                  url = re.fullmatch(r'https://github[.]com/open-goat/pequalnp-proofs/pull/([0-9]+)',
+                                     cmd.stdout.strip())
+                  if url and confirm(c, [api(UPSTREAM_API + 'pulls/' + url[1])]):
+                      return
               rows, _ = current_prs(c)
-              require(confirm(c, rows), 'No confirmed upstream PR for the verified head')
+              if not confirm(c, rows):
+                  time.sleep(4)
+                  rows, _ = current_prs(c)
+                  require(confirm(c, rows), 'No confirmed upstream PR for the verified head')
           
           
           def main():
@@ -204,7 +215,7 @@ jobs:
                       submit(CANDIDATE)
           
           
-          CANDIDATE = {}
+          CANDIDATE = {"base":"2e42ffa3ca973b27a0b68f742315b6787e2c1938","blob":"aad6c7b0a16af9587f01b22745fc3042fe34121c","branch":"pnp/l-meta-2750-resume","ci_sha":"946d7f3310ad06fae64459ef77fdd20afcf5b6c8","file":"lean/PEqualNP/Outside/R_meta_2750_371.lean","kind":"reduce","run":"45442289656","sha":"c91a2edbe73521ab12db0f7661b7efc597229cf2","statement":"f9e5ded54e183a57cc982eff6f152d262c819a98b8c56c369821c365e1d2480d","task":"L-meta-2750","until":1795543730}
           
           if __name__ == '__main__':
               main()
