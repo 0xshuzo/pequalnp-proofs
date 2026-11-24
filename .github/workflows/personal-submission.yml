@@ -243,7 +243,7 @@ jobs:
                       submit(CANDIDATE)
           
           
-          CANDIDATE = {"audit":[6692,6967,7271,7355,8263,8268,8270,8280,8379,8672]}
+          CANDIDATE = {"base":"048c39ff6cbe5014f48a8ac9d9b21cf1fba937c1","blob":"3d301a45343046720d3f851693c7863282796025","branch":"pnp/l-meta-4035-resume","ci_sha":"92a1a4ee2a9f0bd3e25f27a4aa16e1262550ff85","file":"lean/PEqualNP/Outside/R_meta_4035_461.lean","kind":"reduce","run":"45463591438","sha":"0a62f688c326cd433991a10d02b644a5eb192217","statement":"7124dfd26a771d04eb7aca2fff0de069241b93bdafa67fe13747d4744edb2e72","task":"L-meta-4035","until":1795546566}
           
           if __name__ == '__main__':
               main()
