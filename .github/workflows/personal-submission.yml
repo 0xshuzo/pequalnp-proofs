@@ -152,6 +152,55 @@ jobs:
                   require(confirm(c, rows), 'No confirmed upstream PR for the verified head')
           
           
+          def audit(numbers):
+              import io
+              import zipfile
+              for number in numbers:
+                  pr = api(UPSTREAM_API + 'pulls/' + str(number))
+                  require(pr['base']['repo']['id'] == UPSTREAM_ID and pr['user']['login'] == '0xshuzo',
+                          'Unexpected PR in personal verdict audit')
+                  head = pr['head']['sha']
+                  verdict = None
+                  run_id = None
+                  comments = api(UPSTREAM_API + 'issues/' + str(number) + '/comments?per_page=100')
+                  for comment in reversed(comments):
+                      body = comment['body']
+                      commit = re.search(r'Checked on the base repository at commit `([0-9a-f]{10,40})`', body)
+                      link = re.search(r'https://github[.]com/open-goat/pequalnp-proofs/actions/runs/(\d+)', body)
+                      if not commit or not link or not head.startswith(commit[1]):
+                          continue
+                      candidate_run = link[1]
+                      run = api(UPSTREAM_API + 'actions/runs/' + candidate_run)
+                      if run['path'] != '.github/workflows/authoritative.yml' or run['status'] != 'completed':
+                          continue
+                      request = subprocess.run(['gh','api','--hostname','github.com',
+                                                UPSTREAM_API+'actions/runs/'+candidate_run+'/logs'],
+                                               env=gh_env,capture_output=True,timeout=60)
+                      if request.returncode:
+                          continue
+                      try:
+                          with zipfile.ZipFile(io.BytesIO(request.stdout)) as archive:
+                              relevant = [n for n in archive.namelist() if 'Print the checker' in n]
+                              for name in relevant:
+                                  with archive.open(name) as data:
+                                      log = data.read(4000000).decode('utf-8','replace')
+                                  result = re.search(r'Z VERDICT: (ACCEPTED|REJECTED|FAULT)\b', log)
+                                  if result and ('head commit: '+head) in log:
+                                      verdict, run_id = result[1], int(candidate_run)
+                                      break
+                      except zipfile.BadZipFile:
+                          pass
+                      if verdict:
+                          break
+                  print('PR_STATUS', json.dumps({'number':number,'sha':head,'state':pr['state'],
+                        'merged':bool(pr.get('merged_at')),'verdict':verdict,'run':run_id}),
+                        flush=True)
+              for gid in sorted(HELD):
+                  _, others = current_prs({'task':gid,'branch':gid})
+                  live = sorted(p['number'] for p in others if p['state']=='open' and p['user']['login']!='0xshuzo')
+                  print('HELD_COMPETITION',gid,','.join(map(str,live)),flush=True)
+          
+          
           def main():
               global gh_env
               require(os.getenv('GITHUB_REPOSITORY') == FORK and
@@ -176,11 +225,13 @@ jobs:
                   require(repo['full_name'] == UPSTREAM and repo['id'] == UPSTREAM_ID and
                           repo['default_branch'] == 'main', 'Unexpected upstream')
                   print('PERSONAL_LOGIN_CONFIRMED 0xshuzo', flush=True)
-                  if CANDIDATE:
+                  if 'audit' in CANDIDATE:
+                      audit(CANDIDATE['audit'])
+                  elif CANDIDATE:
                       submit(CANDIDATE)
           
           
-          CANDIDATE = {"base":"2e42ffa3ca973b27a0b68f742315b6787e2c1938","blob":"0e0cc4ec6d62a237850a4923883875bf6a0537a2","branch":"pnp/l-meta-2346-resume","ci_sha":"f95a9af283db2eb588dc5d2b23ef7908aa27d659","file":"lean/PEqualNP/Outside/R_meta_2346_461.lean","kind":"reduce","run":"45448951757","sha":"ae79761641e5d02c6ae61a56da939d3ab14eb03f","statement":"89df2c259e23109368bd09e50ace24679fe4ff21c195495f223c899ee854d161","task":"L-meta-2346","until":1795543655}
+          CANDIDATE = {"base":"2e42ffa3ca973b27a0b68f742315b6787e2c1938","blob":"568878cfba27fac6dfb8b5a6cfae27ef128ce7e4","branch":"pnp/l-meta-1973-resume","ci_sha":"ba2fa3ae88683ba9ec85ce425f6de02b4564cd97","file":"lean/PEqualNP/Outside/R_meta_1973_371.lean","kind":"reduce","run":"45451460341","sha":"83d90436de0be76a95a566dd2812f12667b00f17","statement":"836b404f2cebbee10d8f6db90ecc9215b096ed2d79860ce2d0136dcb8f4aceab","task":"L-meta-1973","until":1795543721}
           
           if __name__ == '__main__':
               main()
