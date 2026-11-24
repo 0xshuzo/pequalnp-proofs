@@ -1,0 +1,83 @@
+name: Locate Lean metadata in reduction hypotheses
+on:
+  push:
+    branches:
+      - pnp/diagnose-metadata-3889-5971467b01
+permissions:
+  contents: none
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      BASE_SHA: b69758460af0056923d7d68f789c6b3c6497c51f
+      PROOF_SHA: 5971467b0152657bac6a31e47f393b16f52f6c5f
+      MODULE: PEqualNP.Outside.R_meta_3889_271
+      BLOB_SHA: fdb2784f4c2da748c1e300421fdcd28df4224c29
+      PROOF_FILE: lean/PEqualNP/Outside/R_meta_3889_271.lean
+    steps:
+      - name: Fetch the pinned proof commit
+        run: |
+          set -eu
+          git init -q .
+          git fetch -q --no-tags --depth 2 https://github.com/0xshuzo/pequalnp-proofs.git "$PROOF_SHA"
+          git checkout -q --detach FETCH_HEAD
+          test "$(git rev-parse HEAD)" = "$PROOF_SHA"
+          test "$(git rev-parse HEAD^1)" = "$BASE_SHA"
+          test "$(git hash-object "$PROOF_FILE")" = "$BLOB_SHA"
+          test "$(git diff --name-only HEAD^1 HEAD)" = "$PROOF_FILE"
+      - name: Check the posted reduction and allowed imports
+        run: |
+          set -eu
+          mkdir -p "$RUNNER_TEMP/statement"
+          curl -fsS --proto '=https' --max-redirs 0 --max-filesize 12000000 -o "$RUNNER_TEMP/statement/gaps.json" https://data.pequalnp.com/data/desk/gaps.json
+          node .github/scripts/outside-guard.mjs gap "$RUNNER_TEMP/statement/gaps.json" L-meta-3889 "$PROOF_FILE" "$RUNNER_TEMP/statement" reduce
+          node .github/scripts/outside-guard.mjs imports "$PROOF_FILE" "$RUNNER_TEMP/statement/imports.json" "$PROOF_FILE" reduce
+      - name: Install the project's Lean toolchain
+        run: |
+          set -eu
+          curl -fsSL https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh | sh -s -- -y --default-toolchain none
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+          "$HOME/.elan/bin/elan" toolchain install "$(cat lean/lean-toolchain)"
+      - name: Fetch pinned Mathlib cache
+        working-directory: lean
+        run: lake exe cache get
+      - name: Compile the assigned module with full diagnostics
+        working-directory: lean
+        run: |
+          set -eu
+          marker="lean-$(cat /proc/sys/kernel/random/uuid)"
+          echo "::stop-commands::$marker"
+          if lake build "+$MODULE"; then status=0; else status=$?; fi
+          echo "::$marker::"
+          exit "$status"
+      - name: Show the metadata-bearing terms
+        working-directory: lean
+        run: |
+          set -eu
+          cat > "$RUNNER_TEMP/FindMetadata.lean" <<'LEAN'
+          import PEqualNP.Outside.R_meta_3889_271
+          import Lean
+          open Lean Elab Command
+
+          partial def findMetadata (e : Expr) : List Expr :=
+            match e with
+            | .mdata _ inner => inner :: findMetadata inner
+            | .app f a => findMetadata f ++ findMetadata a
+            | .lam _ t b _ | .forallE _ t b _ => findMetadata t ++ findMetadata b
+            | .letE _ t v b _ => findMetadata t ++ findMetadata v ++ findMetadata b
+            | .proj _ _ b => findMetadata b
+            | _ => []
+
+          run_cmd do
+            let ci ← getConstInfo ``PEqualNP.Outside.R_meta_3889_271
+            let mut t := ci.type
+            for i in [0:3] do
+              let .forallE _ child rest _ := t | throwError "binder missing"
+              let nodes := findMetadata child
+              logInfo m!"Child {i+1}: {nodes.length} metadata nodes"
+              for node in nodes.take 12 do
+                logInfo m!"METADATA child {i+1}: {node}"
+              t := rest
+          LEAN
+          lake env lean "$RUNNER_TEMP/FindMetadata.lean"
