@@ -222,7 +222,7 @@ jobs:
                   print('PR_STATUS', json.dumps({'number':number,'sha':head,'state':pr['state'],
                         'merged':bool(pr.get('merged_at')),'verdict':verdict,'run':run_id,'comments':len(comments),'evidence':observed}),
                         flush=True)
-              for gid in sorted(HELD):
+              for gid in sorted(HELD | {'L-meta-4399'}):
                   _, others = current_prs({'task':gid,'branch':gid})
                   live = sorted(p['number'] for p in others if p['state']=='open' and p['user']['login']!='0xshuzo')
                   print('HELD_COMPETITION',gid,','.join(map(str,live)),flush=True)
