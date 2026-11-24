@@ -1,0 +1,57 @@
+name: Lean proof diagnostics
+on:
+  push:
+    branches:
+      - pnp/diagnostics-2ba6f8fb
+permissions: {}
+jobs:
+  build:
+    name: Compile ${{ matrix.module }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - module: L_meta_3120
+            head: d58f39b05cd4869a2a7189266031ac5cab84d07d
+            base: 048b39bb2c5b2c21da06d44218d16366086a68d9
+          - module: L_meta_3198
+            head: 2280ac741be49ec013b5feeb725b7de25b3861a1
+            base: 048b39bb2c5b2c21da06d44218d16366086a68d9
+    env:
+      PROOF_HEAD: ${{ matrix.head }}
+      BASE_HEAD: ${{ matrix.base }}
+      PROOF_MODULE: ${{ matrix.module }}
+      GIT_TERMINAL_PROMPT: '0'
+    steps:
+      - name: Fetch the exact proof commit
+        run: |
+          set -eu
+          unset GH_TOKEN GITHUB_TOKEN
+          git init -q .
+          git fetch -q --depth 2 --no-tags https://github.com/0xshuzo/pequalnp-proofs.git "$PROOF_HEAD"
+          git checkout -q --detach FETCH_HEAD
+          test "$(git rev-parse HEAD)" = "$PROOF_HEAD"
+          test "$(git show -s --format=%P HEAD)" = "$BASE_HEAD"
+          path="lean/PEqualNP/Outside/$PROOF_MODULE.lean"
+          test "$(git diff --name-only "$BASE_HEAD" HEAD)" = "$path"
+          test "$(git diff --diff-filter=A --name-only "$BASE_HEAD" HEAD)" = "$path"
+      - name: Install the pinned project toolchain
+        run: |
+          set -eu
+          curl -fsSL https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh | sh -s -- -y --default-toolchain none
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+          "$HOME/.elan/bin/elan" toolchain install "$(cat lean/lean-toolchain)"
+      - name: Fetch the pinned Mathlib cache
+        working-directory: lean
+        run: lake exe cache get
+      - name: Compile the proof with Lean diagnostics
+        working-directory: lean
+        run: |
+          set -eu
+          marker="lean-$(cat /proc/sys/kernel/random/uuid)"
+          echo "::stop-commands::$marker"
+          if lake build "+PEqualNP.Outside.$PROOF_MODULE"; then code=0; else code=$?; fi
+          echo "::$marker::"
+          exit "$code"
