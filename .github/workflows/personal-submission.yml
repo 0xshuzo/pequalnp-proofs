@@ -103,7 +103,8 @@ jobs:
           
           def submit(c):
               require(c['kind'] in ('check', 'reduce') and re.fullmatch(r'L-meta-[0-9]+', c['task'])
-                      and c['branch'] == 'pnp/' + c['task'].lower() + '-resume' and
+                      and c['branch'] in {'pnp/' + c['task'].lower() + suffix for suffix in
+                                          (('-resume','-standard') if c['kind']=='check' else ('-resume',))} and
                       re.fullmatch(r'[0-9a-f]{40}', c['sha']), 'Unsupported candidate')
               rows, related = current_prs(c)
               if confirm(c, rows):
@@ -155,6 +156,11 @@ jobs:
           def audit(numbers):
               import io
               import zipfile
+              head_main = api(UPSTREAM_API+'commits/main')['sha']
+              rules = api(UPSTREAM_API+'contents/.github/workflows/advisory.yml?ref='+head_main)
+              body = base64.b64decode(rules['content']).decode()
+              print('UPSTREAM_ADVISORY', head_main,
+                    re.findall(r'--max-filesize ([0-9]+)', body), flush=True)
               for number in numbers:
                   pr = api(UPSTREAM_API + 'pulls/' + str(number))
                   require(pr['base']['repo']['id'] == UPSTREAM_ID and pr['user']['login'] == '0xshuzo',
