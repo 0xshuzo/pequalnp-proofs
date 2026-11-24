@@ -162,6 +162,7 @@ jobs:
                   head = pr['head']['sha']
                   verdict = None
                   run_id = None
+                  observed = {}
                   comments = api(UPSTREAM_API + 'issues/' + str(number) + '/comments?per_page=100')
                   for comment in reversed(comments):
                       body = comment['body']
@@ -171,16 +172,21 @@ jobs:
                           continue
                       candidate_run = link[1]
                       run = api(UPSTREAM_API + 'actions/runs/' + candidate_run)
-                      if run['path'] != '.github/workflows/authoritative.yml' or run['status'] != 'completed':
+                      observed.update(comment_run=int(candidate_run), workflow=run['path'], run_status=run['status'])
+                      if '.github/workflows/authoritative.yml' not in run['path'] or run['status'] != 'completed':
                           continue
                       request = subprocess.run(['gh','api','--hostname','github.com',
                                                 UPSTREAM_API+'actions/runs/'+candidate_run+'/logs'],
                                                env=gh_env,capture_output=True,timeout=60)
+                      observed['log_request'] = request.returncode
                       if request.returncode:
                           continue
                       try:
                           with zipfile.ZipFile(io.BytesIO(request.stdout)) as archive:
                               relevant = [n for n in archive.namelist() if 'Print the checker' in n]
+                              if not relevant:
+                                  relevant=[n for n in archive.namelist() if n.count('/')==0 and n.endswith('.txt')]
+                              observed['log_files']=len(relevant)
                               for name in relevant:
                                   with archive.open(name) as data:
                                       log = data.read(4000000).decode('utf-8','replace')
@@ -189,11 +195,11 @@ jobs:
                                       verdict, run_id = result[1], int(candidate_run)
                                       break
                       except zipfile.BadZipFile:
-                          pass
+                          observed['zip_readable']=False
                       if verdict:
                           break
                   print('PR_STATUS', json.dumps({'number':number,'sha':head,'state':pr['state'],
-                        'merged':bool(pr.get('merged_at')),'verdict':verdict,'run':run_id}),
+                        'merged':bool(pr.get('merged_at')),'verdict':verdict,'run':run_id,'comments':len(comments),'evidence':observed}),
                         flush=True)
               for gid in sorted(HELD):
                   _, others = current_prs({'task':gid,'branch':gid})
