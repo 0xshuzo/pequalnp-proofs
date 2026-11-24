@@ -1,0 +1,79 @@
+name: Verify Petersen reduction
+on:
+  push:
+    branches: [verify-R-meta-2917-657]
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    env:
+      FILE: lean/PEqualNP/Outside/R_meta_2917_657.lean
+    steps:
+      - name: Fetch the pinned project and the candidate
+        run: |
+          set -eu
+          git init -q .
+          git fetch -q --depth 1 https://github.com/brilliant-hq/pequalnp-proofs.git 4ce8b87f411a6542a0027491170e89da86514564
+          git checkout -q --detach FETCH_HEAD
+          git fetch -q --depth 1 https://github.com/0xshuzo/pequalnp-proofs.git b80e7c0dd5335c7df78d80af22fb37d7a0c2ea32
+          git show "FETCH_HEAD:$FILE" > "$FILE"
+          mkdir -p "$RUNNER_TEMP/in"
+          curl -fsS --proto '=https' https://data.pequalnp.com/data/desk/gaps.json -o "$RUNNER_TEMP/in/gaps.json"
+          node .github/scripts/outside-guard.mjs gap "$RUNNER_TEMP/in/gaps.json" L-meta-2917 "$FILE" "$RUNNER_TEMP/in" reduce
+          node .github/scripts/outside-guard.mjs imports "$FILE" "$RUNNER_TEMP/in/imports.json" "$FILE" reduce
+      - name: Install the pinned Lean toolchain
+        run: |
+          set -eu
+          curl -sSfL https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh | sh -s -- -y --default-toolchain none
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+          "$HOME/.elan/bin/elan" toolchain install "$(cat lean/lean-toolchain)"
+
+      - name: Fetch the prebuilt Mathlib
+        working-directory: lean
+        run: lake exe cache get
+
+      - name: Swap space for the verifier
+        run: |
+          set -eu
+          # The verifier needs more memory than a standard runner has for a proof that imports
+          # all of Mathlib; without swap the run hangs (see authoritative.yml, the same step).
+          sudo rm -rf /usr/local/lib/android /opt/ghc /usr/local/.ghcup /usr/share/swift /opt/hostedtoolcache/CodeQL
+          d=$(df -m --output=avail,target / /mnt 2>/dev/null | awk 'NR>1' | sort -rn | awk 'NR==1{print $2}')
+          mb=$(( $(df -m --output=avail "$d" | awk 'NR==2{print $1}') - 6144 ))
+          [ "$mb" -le 12288 ] || mb=12288
+          if [ "$mb" -ge 1024 ]; then
+            f="${d%/}/pnp-swap"
+            sudo fallocate -l "${mb}M" "$f" && sudo chmod 600 "$f"
+            sudo mkswap -q "$f" && sudo swapon "$f"
+          fi
+          free -m
+
+      - name: Run the checker
+        timeout-minutes: 25
+        run: |
+          set -u
+          # The machine the authoritative check runs on (authoritative.yml, the same step): two
+          # cores, at most 6.5 GB of memory with the rest in swap, and 20 minutes. Without
+          # them the 4 core, 16 GB runner starved and lost contact with GitHub, with no log.
+          cap=$(( $(awk '/^MemTotal:/{print $2}' /proc/meminfo) - 1572864 ))
+          [ "$cap" -le 6815744 ] || cap=6815744
+          sudo systemd-run --quiet --scope --collect -p MemoryMax="${cap}K" --uid="$(id -u)" --gid="$(id -g)" \
+            env HOME="$HOME" PATH="$PATH" taskset -c 0,1 timeout -k 30 1200 \
+            node tools/check-lean.mjs "$FILE" "$RUNNER_TEMP/in/statement.txt" reduce > "$RUNNER_TEMP/out" 2> "$RUNNER_TEMP/err"
+          code=$?
+          case "$code" in 124|137) echo "the checker was stopped after 20 minutes" >> "$RUNNER_TEMP/err" ;; esac
+          pkill -KILL -f "lean/.lake/build/bin/checklemma" || true
+          # The output can quote the proof file, so it is printed with workflow commands switched off.
+          stop="stop-$(od -An -N16 -tx1 /dev/urandom | tr -d ' \n')"
+          echo "::stop-commands::$stop"
+          tail -n 40 "$RUNNER_TEMP/err"
+          tail -n 60 "$RUNNER_TEMP/out"
+          echo "::$stop::"
+          case "$code" in
+            0) echo "ADVISORY VERDICT: ACCEPTED (advisory only: the check that counts runs from the base branch)" ;;
+            1) echo "ADVISORY VERDICT: REJECTED (the last line above says why)" ;;
+            *) echo "ADVISORY VERDICT: the checker could not run (exit $code)" ;;
+          esac
+          exit "$code"
