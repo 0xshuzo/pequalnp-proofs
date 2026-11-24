@@ -258,7 +258,7 @@ jobs:
                       submit(CANDIDATE)
           
           
-          CANDIDATE = {"base":"2b192eb3d944ae34dcd5c74ebc11291ee7f55eef","blob":"7689231cbadd1c67486249023de6ff5be2fad2fa","branch":"pnp/l-meta-4817-resume","ci_sha":"a3ddb1f9ba4688316b9a8d96ffe79e1113c3dbda","file":"lean/PEqualNP/Outside/R_meta_4817_633.lean","kind":"reduce","run":"45481151707","sha":"5d3007ddeb8b3086c3d211def93e7c12ebaea749","statement":"7b51826a6bb575b4800d88b7c4857d6731679220a576d66f80d4ba36f5cf2a1b","task":"L-meta-4817","until":1795552586}
+          CANDIDATE = {"base":"1ebe834c8fd13348811aa1441baa78bcb9c5aee7","blob":"c08f5149ce474c71574af1b0d504b3a8c78e4c33","branch":"pnp/l-meta-4895-resume","ci_sha":"7db60879f0238b93436ee95e2b77b23926979030","file":"lean/PEqualNP/Outside/R_meta_4895_215.lean","kind":"reduce","run":"45481705119","sha":"dc41ae82824be3ff75ea03c39d249f88f7d0b320","statement":"3a5be4e3e8e0250431fe329d4c444c78f2f089d2a95fd47ba7e8a51a79da3dd3","task":"L-meta-4895","until":1795552658}
           
           if __name__ == '__main__':
               main()
