@@ -102,9 +102,12 @@ jobs:
           
           
           def submit(c):
+              suffixes = ('-resume', '-standard') if c['kind'] == 'check' else ('-resume',)
+              branches = {'pnp/' + c['task'].lower() + suffix for suffix in suffixes}
+              if c['task'] == 'L-meta-2309' and c['kind'] == 'check':
+                  branches = {'pnp/w1-l-meta-2309-1795524722'}
               require(c['kind'] in ('check', 'reduce') and re.fullmatch(r'L-meta-[0-9]+', c['task'])
-                      and c['branch'] in {'pnp/' + c['task'].lower() + suffix for suffix in
-                                          (('-resume','-standard') if c['kind']=='check' else ('-resume',))} and
+                      and c['branch'] in branches and
                       re.fullmatch(r'[0-9a-f]{40}', c['sha']), 'Unsupported candidate')
               rows, related = current_prs(c)
               if confirm(c, rows):
@@ -255,7 +258,7 @@ jobs:
                       submit(CANDIDATE)
           
           
-          CANDIDATE = {"base":"c48a11c8d0eb5957d9d3970e18b7d7a2b2c1f0e8","blob":"2841b47f303766a4854e1dfc3d42c275b24d7ffe","branch":"pnp/l-meta-4189-resume","ci_sha":"d95cbcb8966f08bd8b6929a53683a5dd28f55958","file":"lean/PEqualNP/Outside/R_meta_4189_761.lean","kind":"reduce","run":"45473146435","sha":"ed989111456cdc3f44678775cb9a34e9042189ce","statement":"5d10b68a090a78ac1b9bf538c183680f9fbf1a4826387ae016ec7a88f019fff3","task":"L-meta-4189","until":1795549761}
+          CANDIDATE = {"audit":[6692,6967,7271,7355,8263,8268,8270,8280,8379,8672,8740,8746,8815,8947,8986,9000,9086,9120,9225,9255],"public_runs":{"6967":"45435012822","7355":"45436578329"}}
           
           if __name__ == '__main__':
               main()
