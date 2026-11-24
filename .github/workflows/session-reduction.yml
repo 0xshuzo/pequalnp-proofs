@@ -30,7 +30,7 @@ jobs:
         run: |
           set -eu
           mkdir -p "$RUNNER_TEMP/statement"
-          curl -fsS --proto '=https' --max-redirs 0 --max-filesize 5000000 -o "$RUNNER_TEMP/statement/gaps.json" https://data.pequalnp.com/data/desk/gaps.json
+          curl -fsS --proto '=https' --max-redirs 0 --max-filesize 12000000 -o "$RUNNER_TEMP/statement/gaps.json" https://data.pequalnp.com/data/desk/gaps.json
           node .github/scripts/outside-guard.mjs gap "$RUNNER_TEMP/statement/gaps.json" L-meta-2346 "$PROOF_FILE" "$RUNNER_TEMP/statement" reduce
           node .github/scripts/outside-guard.mjs imports "$PROOF_FILE" "$RUNNER_TEMP/statement/imports.json" "$PROOF_FILE" reduce
       - name: Install the project's Lean toolchain
