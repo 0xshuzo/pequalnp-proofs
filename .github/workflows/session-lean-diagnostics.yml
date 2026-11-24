@@ -13,9 +13,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - module: L_meta_3415
-            head: 3ba9311203df4da231eef94fd7cb77938cf9dea9
+          - module: L_meta_3120
+            head: 82f6ece6d144134e9addf2fb973f53709826f650
             base: 048b39bb2c5b2c21da06d44218d16366086a68d9
+            measure: 'yes'
     env:
       PROOF_HEAD: ${{ matrix.head }}
       BASE_HEAD: ${{ matrix.base }}
@@ -44,11 +45,34 @@ jobs:
         working-directory: lean
         run: lake exe cache get
       - name: Compile the proof with Lean diagnostics
+        if: matrix.measure != 'yes'
         working-directory: lean
         run: |
           set -eu
           marker="lean-$(cat /proc/sys/kernel/random/uuid)"
           echo "::stop-commands::$marker"
           if lake build "+PEqualNP.Outside.$PROOF_MODULE"; then code=0; else code=$?; fi
+          echo "::$marker::"
+          exit "$code"
+      - name: Profile Lean proof declarations
+        if: matrix.measure == 'yes'
+        working-directory: lean
+        run: |
+          set -eu
+          lake build +PEqualNP.Defs
+          marker="lean-$(cat /proc/sys/kernel/random/uuid)"
+          echo "::stop-commands::$marker"
+          if lake env lean -Dprofiler=true -Dprofiler.threshold=1000 -Dtrace.profiler=true -Dtrace.profiler.threshold=2000 -Dtrace.profiler.output="$RUNNER_TEMP/timings.json" "PEqualNP/Outside/$PROOF_MODULE.lean"; then code=0; else code=$?; fi
+          if test -s "$RUNNER_TEMP/timings.json"; then
+            python3 - "$RUNNER_TEMP/timings.json" <<'PYTHON'
+          import json,sys
+          with open(sys.argv[1]) as f:
+              raw=json.load(f)
+          events=raw if isinstance(raw,list) else raw.get('traceEvents',[])
+          spans=[e for e in events if e.get('ph')=='X' and isinstance(e.get('dur'),(int,float))]
+          for e in sorted(spans,key=lambda e:e['dur'],reverse=True)[:60]:
+              print('PROFILE_SECONDS',round(e['dur']/1e6,3),str(e.get('name'))[:180],str(e.get('args',{}))[:400])
+          PYTHON
+          fi
           echo "::$marker::"
           exit "$code"
