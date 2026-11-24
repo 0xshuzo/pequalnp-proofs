@@ -258,7 +258,7 @@ jobs:
                       submit(CANDIDATE)
           
           
-          CANDIDATE = {"base":"680d3d34e2d92fe6828044d3e6d5fb16fd708f3b","blob":"818ab910c22fedd39763e28297906f427f04adf7","branch":"pnp/l-meta-5002-resume","ci_sha":"5330a1703a42efa9766c820f566cfe0d238faf2f","file":"lean/PEqualNP/Outside/L_meta_5002.lean","kind":"check","run":"45497716475","sha":"5330a1703a42efa9766c820f566cfe0d238faf2f","statement":"ad8397d04cee164442078cd39c9691efbaa33ce0c37fe057131e20925f0353b1","task":"L-meta-5002","until":1795559582}
+          CANDIDATE = {"base":"60161243826570a9c92d2752bec0224eb9efe53d","blob":"d74dd1ed2397281e2d0186eebc2894863fd1d24b","branch":"pnp/l-meta-3172-resume","ci_sha":"838facb60c00ecbd0bc0c69b4261edcf73461cc9","file":"lean/PEqualNP/Outside/L_meta_3172.lean","kind":"check","run":"45498047048","sha":"838facb60c00ecbd0bc0c69b4261edcf73461cc9","statement":"d0ea511a6d20c5f6d640b5cb5fc392c5a74be54b3062bc7783aa0548c457b1f7","task":"L-meta-3172","until":1795559606}
           
           if __name__ == '__main__':
               main()
