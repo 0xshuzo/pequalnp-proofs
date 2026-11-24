@@ -116,8 +116,11 @@ jobs:
               for other in related:
                   if other['state'] == 'open':
                       files = api(UPSTREAM_API + 'pulls/' + str(other['number']) + '/files')
-                      require(all(f['filename'] != c['file'] for f in files),
-                              'Another open PR already adds this file')
+                      same_path = [f for f in files if f['filename'] == c['file']]
+                      for f in same_path:
+                          require(f.get('sha') and f['sha'] != c['blob'],
+                                  'The same proof file already exists in an open PR')
+                          print('Distinct proof on the same task in PR', other['number'], flush=True)
               checked_competitors = {p['number'] for p in related if p['state'] == 'open'}
               verify_ci(c)
               main = api(UPSTREAM_API + 'commits/main')['sha']
@@ -243,7 +246,7 @@ jobs:
                       submit(CANDIDATE)
           
           
-          CANDIDATE = {"base":"048c39ff6cbe5014f48a8ac9d9b21cf1fba937c1","blob":"c4c4c32e8ba887268dee3b54a69192d45ab2301a","branch":"pnp/l-meta-4385-resume","ci_sha":"d4e13254dba781abcbbaa3cf1c1cb3ccc4cc75aa","file":"lean/PEqualNP/Outside/L_meta_4385.lean","kind":"check","run":"45465208637","sha":"d4e13254dba781abcbbaa3cf1c1cb3ccc4cc75aa","statement":"274c9e25cfcff5f6ff230931602a7b81bbcc722856a0fcc91c76d499d8e07623","task":"L-meta-4385","until":1795547123}
+          CANDIDATE = {"base":"048c39ff6cbe5014f48a8ac9d9b21cf1fba937c1","blob":"c4c4c32e8ba887268dee3b54a69192d45ab2301a","branch":"pnp/l-meta-4385-resume","ci_sha":"d4e13254dba781abcbbaa3cf1c1cb3ccc4cc75aa","file":"lean/PEqualNP/Outside/L_meta_4385.lean","kind":"check","run":"45465208637","sha":"d4e13254dba781abcbbaa3cf1c1cb3ccc4cc75aa","statement":"274c9e25cfcff5f6ff230931602a7b81bbcc722856a0fcc91c76d499d8e07623","task":"L-meta-4385","until":1795547168}
           
           if __name__ == '__main__':
               main()
