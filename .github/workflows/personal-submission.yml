@@ -674,7 +674,7 @@ jobs:
                       submit(CANDIDATE)
           
           
-          CANDIDATE = {"base":"e125f04d0dc6fed67cee48a1d06692912e167c32","blob":"66daa72caf2a5bee72b35cfb81c4247d3cffb27d","branch":"pnp/l-meta-12144-resume","ci_sha":"3340ec1a10eb4fb337ba29d7c6e397a37bb9105b","desk_prs":[],"file":"lean/PEqualNP/Outside/L_meta_12144.lean","kind":"check","leased_task":"L-meta-12144","run":"45653264865","sha":"3340ec1a10eb4fb337ba29d7c6e397a37bb9105b","statement":"df886117d2468151dbbb584c6bb7a4df9c78a7c2606060fdcda9b344cbc5e637","task":"L-meta-12144","until":1795625056}
+          CANDIDATE = {"base":"e125f04d0dc6fed67cee48a1d06692912e167c32","blob":"630a655f3cd01d4c61447c69b5003657d6a3e2cf","branch":"pnp/l-meta-12575-resume","ci_sha":"83d7f474d8092e738e56469032ac35de2358e2e1","desk_prs":[],"file":"lean/PEqualNP/Outside/L_meta_12575.lean","kind":"check","leased_task":"L-meta-12575","run":"45655728617","sha":"83d7f474d8092e738e56469032ac35de2358e2e1","statement":"e17076a11c1d01cc423611d18e0cd044f09419f4c6b9e1a54957a6ffb63238cd","task":"L-meta-12575","until":1795625107}
           
           if __name__ == '__main__':
               main()
