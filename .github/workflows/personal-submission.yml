@@ -407,6 +407,15 @@ jobs:
               require(api(branch_ref)['object']['sha'] == c['sha'], 'Fork branch moved during verification')
               require({p['number'] for p in related if p['state'] == 'open'} == checked_competitors,
                       'Competition changed during verification; recheck before submitting')
+              # A three-dot comparison can still show a file as added after a competing merge.
+              # Check the current main tree itself immediately before creating the PR.
+              completed_file = 'lean/PEqualNP/Outside/' + c['task'].replace('-', '_') + '.lean'
+              for path in dict.fromkeys([completed_file, c['file']]):
+                  found = gh('api', '--hostname', 'github.com', '--silent',
+                             UPSTREAM_API + 'contents/' + quote(path, safe='/') + '?ref=main', check=False)
+                  require(found.returncode != 0, 'Proof file already present on upstream main: ' + path)
+                  require(re.search(r'HTTP 404\b', found.stderr),
+                          found.stderr.strip() or 'Could not verify the current upstream file')
               require(time.time() < c['until'], 'Lease confirmation expired')
               cmd = gh('pr', 'create', '--repo', UPSTREAM, '--base', 'main', '--head',
                        '0xshuzo:' + c['branch'], '--title', c['task'], '--body', '',
@@ -674,7 +683,7 @@ jobs:
                       submit(CANDIDATE)
           
           
-          CANDIDATE = {"closures":1}
+          CANDIDATE = {"base":"54c73b8a8f4d3e48adb987e4be9191b52d586665","blob":"750be97039c8a859244b4243a675e9a7a04001f3","branch":"pnp/l-meta-14011-resume","ci_sha":"c0c1119c2385768238287f829f180837ba6829f7","desk_prs":[17755],"file":"lean/PEqualNP/Outside/L_meta_14011.lean","kind":"check","leased_task":"L-meta-14011","run":"45664672200","sha":"c0c1119c2385768238287f829f180837ba6829f7","statement":"251282b10e7626c636d77769bb646e3b06752413a3274db13d585b27b5fab534","task":"L-meta-14011","until":1795628105}
           
           if __name__ == '__main__':
               main()
