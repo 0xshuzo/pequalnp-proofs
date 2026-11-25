@@ -379,12 +379,16 @@ jobs:
               checked_competitors = {p['number'] for p in related if p['state'] == 'open'}
               verify_ci(c)
               main = api(UPSTREAM_API + 'commits/main')['sha']
-              compare = api(UPSTREAM_API + 'compare/main...' + quote('0xshuzo:' + c['branch'], safe=''))
-              require(compare['base_commit']['sha'] == main and compare['ahead_by'] == 1 and
-                      [p['sha'] for p in compare['commits']] == [c['sha']] and
-                      [p['sha'] for p in compare['commits'][0]['parents']] == [c['base']] and
-                      [(f['filename'], f['status'], f['sha']) for f in compare['files']] ==
-                      [(c['file'], 'added', c['blob'])], 'Upstream comparison changed')
+              branch_ref = FORK_API + 'git/ref/heads/' + quote(c['branch'], safe='/')
+              require(api(branch_ref)['object']['sha'] == c['sha'], 'Fork branch no longer points to checked commit')
+              compare = api(UPSTREAM_API + 'compare/' + main + '...' + c['sha'])
+              require(compare['base_commit']['sha'] == main, 'Comparison base differs from pinned upstream main')
+              require(compare['ahead_by'] == 1 and [p['sha'] for p in compare['commits']] == [c['sha']],
+                      'Upstream comparison does not contain exactly the checked commit')
+              require([p['sha'] for p in compare['commits'][0]['parents']] == [c['base']],
+                      'Compared commit parent differs from proof base')
+              require([(f['filename'], f['status'], f['sha']) for f in compare['files']] ==
+                      [(c['file'], 'added', c['blob'])], 'Upstream comparison file or blob differs')
               require(time.time() < c['until'], 'Desk and lease verification is stale')
               if c['kind']=='reduce' and reduction_capacity()['occupied']>=5:
                   print('REDUCTION_HELD',c['task'],c['sha'],flush=True)
@@ -394,6 +398,7 @@ jobs:
                   return
               require(not rows and not any(p['state'] == 'open' and p['user']['login'] == '0xshuzo'
                                            for p in related), 'Own source or task PR already exists')
+              require(api(branch_ref)['object']['sha'] == c['sha'], 'Fork branch moved during verification')
               require({p['number'] for p in related if p['state'] == 'open'} == checked_competitors,
                       'Competition changed during verification; recheck before submitting')
               require(time.time() < c['until'], 'Lease confirmation expired')
@@ -644,7 +649,7 @@ jobs:
                       submit(CANDIDATE)
           
           
-          CANDIDATE = {"audit":[6692,6967,7271,7355,8263,8268,8270,8280,8379,8672,8740,8746,8815,8947,8986,9000,9086,9120,9225,9255,9316,9336,9476,9485,9540,9596,9645,9659,9773,9972,9990,10012,10062,10094,10111,10117,10288,10329,10338,10423,10428,10432,10486,10505,10599,10610,10625,10629,10662,10683,10686,10702,10709,10727,10730,10798,10802,10831,10851,10857,10904,10907,10926,10946,10950,10973,11046,11083,11100,11105,11176,11251,12017,12203,12703,12861,13087,13088,13398,14506,14571,14675,14696,14770,14779,14821,14845,14850],"inspect_steps":[{"gap":"L-meta-10918","prs":[14781]},{"gap":"L-meta-10129","prs":[]},{"gap":"L-meta-11008","prs":[]}],"public_runs":{"10428":"45501842211","10432":"45501847813","12703":"45561077971","12861":"45566909850","13087":"45583199002","13088":"45585105347","14506":"45616980674","14571":"45617234451","6967":"45435012822","7355":"45436578329","8815":"45477475396","9000":"45474201952","9225":"45474622265","9972":"45489438368"}}
+          CANDIDATE = {"base":"761ccc37b7d04c95e0f2075626cbe4f3bcd85b06","blob":"5fb6ddbd4b66fdb48c2f8fbcc42b5f4ac34b1e06","branch":"pnp/l-meta-10918-resume","ci_sha":"78a34fb764a8fec70f09f646f534a10be9119b39","desk_prs":[14781],"file":"lean/PEqualNP/Outside/L_meta_10918.lean","kind":"check","leased_task":"L-meta-10919","run":"45621078706","sha":"78a34fb764a8fec70f09f646f534a10be9119b39","statement":"edf110d23b2b1d19ef267ace8835a7566173e08fd06e8e9339cb2c9a8a9392f5","task":"L-meta-10918","until":1795613115}
           
           if __name__ == '__main__':
               main()
