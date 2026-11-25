@@ -716,7 +716,7 @@ jobs:
                       submit(CANDIDATE)
           
           
-          CANDIDATE = {'task': 'L-meta-14174', 'defer_competing_table': False, 'leased_task': 'L-meta-14174', 'file': 'lean/PEqualNP/Outside/L_meta_14174.lean', 'branch': 'pnp/l-meta-14174-resume', 'kind': 'check', 'run': '45670316350', 'ci_sha': '17e8fd492969110f8d2b32031298654d8ddf2b8f', 'desk_prs': [], 'sha': '17e8fd492969110f8d2b32031298654d8ddf2b8f', 'base': 'ed419030b2f93e3f357003611f865f28e436bd9a', 'blob': '6000b1288ad68e455ba34f10d9fef04832469080', 'statement': '06aa7b311df71b5723c3447e538429d0c8a97ca4ee88660ffb7781d2bda6bf63', 'until': 1795630096}
+          CANDIDATE = {'closures': 1}
           
           if __name__ == '__main__':
               main()
