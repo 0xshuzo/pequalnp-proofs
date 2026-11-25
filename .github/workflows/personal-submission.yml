@@ -716,7 +716,7 @@ jobs:
                       submit(CANDIDATE)
           
           
-          CANDIDATE = {'cleanup_refs': 1, 'cleanup_branches': ['pnp/check-l-meta-3921-cf154db5ea', 'pnp/check-l-meta-3921-eecceae2aa', 'pnp/check-l-meta-4035-0a62f688c3', 'pnp/check-l-meta-4043-42685a47b5']}
+          CANDIDATE = {'task': 'L-meta-14224', 'defer_competing_table': False, 'leased_task': 'L-meta-14224', 'file': 'lean/PEqualNP/Outside/L_meta_14224.lean', 'branch': 'pnp/l-meta-14224-resume', 'kind': 'check', 'run': '45670041765', 'ci_sha': '07ac9b58ec3526e8d19e82aa9b0a61f1c2f9f184', 'desk_prs': [], 'sha': '07ac9b58ec3526e8d19e82aa9b0a61f1c2f9f184', 'base': 'ed419030b2f93e3f357003611f865f28e436bd9a', 'blob': 'a8cf4b3b04982489a409e3877687760bd29d3ead', 'statement': '2bfe44627ac1159f4cee3f8671206ec44037b733272123656fc9eb27a43ed15f', 'until': 1795629951}
           
           if __name__ == '__main__':
               main()
