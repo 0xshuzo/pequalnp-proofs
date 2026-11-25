@@ -644,7 +644,7 @@ jobs:
                       submit(CANDIDATE)
           
           
-          CANDIDATE = {"closures":1}
+          CANDIDATE = {"capacity":1}
           
           if __name__ == '__main__':
               main()
