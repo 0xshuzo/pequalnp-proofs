@@ -674,7 +674,7 @@ jobs:
                       submit(CANDIDATE)
           
           
-          CANDIDATE = {"closures":1}
+          CANDIDATE = {"base":"c85fc5a845a2f4264c3f6a78fb0092b6c6dd5f69","blob":"63b1dbf1b166549b75273d5a98fcce3491f6ef92","branch":"pnp/l-meta-12088-resume","ci_sha":"e2607f20aeb907a16dd5365e31b8f57a015b011a","desk_prs":[16417,16456,17348],"file":"lean/PEqualNP/Outside/L_meta_12088.lean","kind":"check","leased_task":"L-meta-12088","run":"45662930677","sha":"e2607f20aeb907a16dd5365e31b8f57a015b011a","statement":"7428d12e977861a22d7cffde06c32ad2c26030e2bf284900cc443eee16706001","task":"L-meta-12088","until":1795627521}
           
           if __name__ == '__main__':
               main()
