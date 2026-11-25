@@ -251,6 +251,20 @@ jobs:
               return branch, related
           
           
+          def foreign_standard_prs(c, related):
+              path = 'lean/PEqualNP/Outside/' + c['task'].replace('-', '_') + '.lean'
+              foreign = []
+              for p in related:
+                  if p['state'] != 'open' or p['user']['login'].lower() == '0xshuzo':
+                      continue
+                  files = api(UPSTREAM_API + 'pulls/' + str(p['number']) + '/files?per_page=2')
+                  if len(files) == 1 and files[0]['filename'] == path and files[0]['status'] == 'added':
+                      foreign.append(p['number'])
+              observation = {'task': c['task'], 'prs': sorted(foreign)}
+              print('TABLE_COMPETITION', json.dumps(observation), flush=True)
+              return foreign
+          
+          
           def confirm(c, rows):
               hits = [p for p in rows if p['state'] == 'open' or p.get('merged_at')]
               hits = [p for p in hits if p['head']['sha'] == c['sha'] and
@@ -404,6 +418,8 @@ jobs:
                   return
               require(not rows and not any(p['state'] == 'open' and p['user']['login'] == '0xshuzo'
                                            for p in related), 'Own source or task PR already exists')
+              if c.get('defer_competing_table'):
+                  require(not foreign_standard_prs(c, related), 'Earlier open standard proof for this truth table')
               require(api(branch_ref)['object']['sha'] == c['sha'], 'Fork branch moved during verification')
               require({p['number'] for p in related if p['state'] == 'open'} == checked_competitors,
                       'Competition changed during verification; recheck before submitting')
@@ -673,6 +689,12 @@ jobs:
                   print('PERSONAL_LOGIN_CONFIRMED 0xshuzo', flush=True)
                   if 'cleanup_refs' in CANDIDATE:
                       fork_refs_in_upstream_prs(CANDIDATE.get('cleanup_branches',[]))
+                  elif 'inspect_table' in CANDIDATE:
+                      step = CANDIDATE['inspect_table']
+                      require(re.fullmatch(r'L-[a-z]+-[0-9]+', step), 'Unexpected truth table')
+                      query = {'task': step, 'branch':'pnp/'+step.lower()+'-resume', 'desk_prs':CANDIDATE['desk_prs']}
+                      _, related = current_prs(query)
+                      foreign_standard_prs(query, related)
                   elif 'capacity' in CANDIDATE:
                       reduction_capacity()
                   elif 'closures' in CANDIDATE:
@@ -683,7 +705,7 @@ jobs:
                       submit(CANDIDATE)
           
           
-          CANDIDATE = {"base":"54c73b8a8f4d3e48adb987e4be9191b52d586665","blob":"750be97039c8a859244b4243a675e9a7a04001f3","branch":"pnp/l-meta-14011-resume","ci_sha":"c0c1119c2385768238287f829f180837ba6829f7","desk_prs":[17755],"file":"lean/PEqualNP/Outside/L_meta_14011.lean","kind":"check","leased_task":"L-meta-14011","run":"45664672200","sha":"c0c1119c2385768238287f829f180837ba6829f7","statement":"251282b10e7626c636d77769bb646e3b06752413a3274db13d585b27b5fab534","task":"L-meta-14011","until":1795628105}
+          CANDIDATE = {"desk_prs":[17543],"inspect_table":"L-meta-13271"}
           
           if __name__ == '__main__':
               main()
