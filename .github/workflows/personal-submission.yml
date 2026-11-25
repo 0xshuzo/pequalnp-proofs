@@ -699,12 +699,13 @@ jobs:
                   print('PERSONAL_LOGIN_CONFIRMED 0xshuzo', flush=True)
                   if 'cleanup_refs' in CANDIDATE:
                       fork_refs_in_upstream_prs(CANDIDATE.get('cleanup_branches',[]))
-                  elif 'inspect_table' in CANDIDATE:
-                      step = CANDIDATE['inspect_table']
-                      require(re.fullmatch(r'L-[a-z]+-[0-9]+', step), 'Unexpected truth table')
-                      query = {'task': step, 'branch':'pnp/'+step.lower()+'-resume', 'desk_prs':CANDIDATE['desk_prs']}
-                      _, related = current_prs(query)
-                      foreign_standard_prs(query, related)
+                  elif 'inspect_tables' in CANDIDATE:
+                      for entry in CANDIDATE['inspect_tables']:
+                          step = entry['step']
+                          require(re.fullmatch(r'L-[a-z]+-[0-9]+', step), 'Unexpected truth table')
+                          query = {'task':step, 'branch':'pnp/'+step.lower()+'-resume', 'desk_prs':entry['prs']}
+                          _, related = current_prs(query)
+                          foreign_standard_prs(query, related)
                   elif 'capacity' in CANDIDATE:
                       reduction_capacity()
                   elif 'closures' in CANDIDATE:
@@ -715,7 +716,7 @@ jobs:
                       submit(CANDIDATE)
           
           
-          CANDIDATE = {"desk_prs":[17691,18095],"inspect_table":"L-meta-13887"}
+          CANDIDATE = {"inspect_tables":[{"prs":[18108,18205],"step":"L-meta-13507"},{"prs":[17913,18118,18251,18255],"step":"L-meta-13663"}]}
           
           if __name__ == '__main__':
               main()
