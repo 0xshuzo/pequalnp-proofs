@@ -644,7 +644,7 @@ jobs:
                       submit(CANDIDATE)
           
           
-          CANDIDATE = {"closures":1}
+          CANDIDATE = {"cleanup_branches":["pnp/verify-lemmas-1587232dfbb3","pnp/verify-lemmas-15aaa0920fd5","pnp/verify-lemmas-15b4ad53ff8e","pnp/verify-lemmas-15cae8447566","pnp/verify-lemmas-16dbf1628d1e","pnp/verify-lemmas-16ea32239142","pnp/verify-lemmas-17148cb554bf","pnp/verify-lemmas-173ec35ac90c"],"cleanup_refs":1}
           
           if __name__ == '__main__':
               main()
