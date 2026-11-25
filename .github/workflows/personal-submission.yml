@@ -716,7 +716,7 @@ jobs:
                       submit(CANDIDATE)
           
           
-          CANDIDATE = {'task': 'L-meta-15074', 'defer_competing_table': False, 'leased_task': 'L-meta-15074', 'file': 'lean/PEqualNP/Outside/L_meta_15074.lean', 'branch': 'pnp/l-meta-15074-resume', 'kind': 'check', 'run': '45674355966', 'ci_sha': '0dff91944e3a8ec679c83ba507fffc622488d04a', 'desk_prs': [19040], 'sha': '0dff91944e3a8ec679c83ba507fffc622488d04a', 'base': 'f8ed64712f92c95e23c7dde9d5ab50d315601930', 'blob': '890cd5f56acd9a5327bba2f828a5893153f4cbd0', 'statement': '79db1f810e3da7e89761e09e69eaf4e906562eefd2244637853ef9c05be8b14c', 'until': 1795631385}
+          CANDIDATE = {'inspect_tables': [{'step': 'L-meta-12114', 'prs': []}]}
           
           if __name__ == '__main__':
               main()
