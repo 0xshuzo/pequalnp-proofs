@@ -61,6 +61,14 @@ jobs:
                       'Task PR search incomplete')
               pattern = re.compile(r'(?<![a-z0-9])' + re.escape(c['task']) + r'(?![a-z0-9])', re.I)
               related = [p for p in result['items'] if pattern.search(p['title'])]
+              indexed = {p['number'] for p in related}
+              for number in c.get('desk_prs', []):
+                  if number not in indexed:
+                      pull = api(UPSTREAM_API + 'pulls/' + str(number))
+                      require(pull['number'] == number and pull['base']['repo']['id'] == UPSTREAM_ID,
+                              'Unexpected repository for desk-listed PR')
+                      related.append(pull)
+                      indexed.add(number)
               print('Previous PRs for task:', [(p['number'], p['state']) for p in related], flush=True)
               return branch, related
           
@@ -272,7 +280,7 @@ jobs:
                       submit(CANDIDATE)
           
           
-          CANDIDATE = {"base":"f5b96049cdbe39e28dcbd7d08d2e51482b01293c","blob":"f3e50535a2d72aa082b77b616ee8d6d1df2ac582","branch":"pnp/l-meta-4111-resume","ci_sha":"748b1b220aec8dcf422bb3b56f2ebbf3275c9906","file":"lean/PEqualNP/Outside/R_meta_4111_1.lean","kind":"reduce","run":"45520473459","sha":"9a8c8300986b6e7739f197418dfc9feafc7f2038","statement":"968bd8ceaaab80ab0dfe3957553347e3dfbdd9925738f0cff7f354cc4d677532","task":"L-meta-4111","until":1795568138}
+          CANDIDATE = {"audit":[6692,6967,7271,7355,8263,8268,8270,8280,8379,8672,8740,8746,8815,8947,8986,9000,9086,9120,9225,9255,9316,9336,9476,9485,9540,9596,9645,9659,9773,9972,9990,10012,10062,10094,10111,10117,10288,10329,10338,10423,10428,10432,10486,10505,10599,10610,10625,10629,10662,10683,10686,10702,10709,10727,10730,10798,10802,10831,10851,10857,10904,10907,10926,10946,10950,10973,11046,11083,11100,11105],"inspect":{"gap":"L-meta-5264","prs":[10914,11052,11100]},"public_runs":{"10432":"45501847813","6967":"45435012822","7355":"45436578329","8815":"45477475396","9000":"45474201952","9225":"45474622265"}}
           
           if __name__ == '__main__':
               main()
