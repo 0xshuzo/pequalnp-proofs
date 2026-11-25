@@ -674,7 +674,7 @@ jobs:
                       submit(CANDIDATE)
           
           
-          CANDIDATE = {"base":"c85fc5a845a2f4264c3f6a78fb0092b6c6dd5f69","blob":"1b6e0fd6f9c422e1fc5737b6229e40640402e5ec","branch":"pnp/l-meta-13465-resume","ci_sha":"ff281585e848b4467fcdb03da447ea4af99cf30c","desk_prs":[17618],"file":"lean/PEqualNP/Outside/L_meta_13465.lean","kind":"check","leased_task":"L-meta-13465","run":"45663363561","sha":"ff281585e848b4467fcdb03da447ea4af99cf30c","statement":"8dfadcd22e2f88b46e204b9ff9d6ce957325f0e684e64b90d06c56f8d3730287","task":"L-meta-13465","until":1795627610}
+          CANDIDATE = {"cleanup_branches":["pnp/verify-lemmas-2a847a372de9","pnp/verify-lemmas-2a946b8ad3ad","pnp/verify-lemmas-2ad3dcf2bf2d","pnp/verify-lemmas-2ae03f7bd239","pnp/verify-lemmas-2b2c0322bece","pnp/verify-lemmas-2b76c10b2022","pnp/verify-lemmas-2bb845f11648","pnp/verify-lemmas-2c03016653c2"],"cleanup_refs":1}
           
           if __name__ == '__main__':
               main()
