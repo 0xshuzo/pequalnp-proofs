@@ -1,0 +1,755 @@
+import PEqualNP.Defs
+namespace PCX150
+open PEqualNP.ProofComplexity
+abbrev V := Fin 4 × Fin 3
+abbrev Cl := Clause V
+abbrev Row := Fin 60
+def fullMask : Nat := 1152921504606846975
+def rows : Array Nat := #[672,784,1120,1288,2128,2184,644,770,1092,1281,2114,2177,532,546,1036,1057,2058,2065,84,98,140,161,266,273,1289,2185,1121,2129,1100,2122,673,785,652,778,596,610,786,2130,674,2186,660,2193,1122,1290,1108,1297,1164,1185,676,1124,788,1292,802,1313,2132,2188,2146,2209,2314,2321]
+def ones : Array Nat := #[729761264001255936,364805838240031872,58354402365559104,326590701323239464,595657351441551378,230673451842052101,90657122719368468,180640694878079073,881623687009141386,5912485265682627,12099026304418572,1134909993020230704]
+def zeros : Array Nat := #[423160240605591039,788115666366815103,1094567102241287871,826330803283607511,557264153165295597,922248052764794874,1062264381887478507,972280809728767902,271297817597705589,1147009019341164348,1140822478302428403,18011511586616271]
+def labelMasks : Array Nat := #[63,4032,258048,16515072,50331648,201326592,805306368,3221225472,12884901888,51539607552,206158430208,824633720832,3298534883328,13194139533312,52776558133248,211106232532992,844424930131968,3377699720527872,13510798882111488,54043195528445952,216172782113783808,864691128455135232]
+def lits : List (Literal V) := [((0,0),false),((0,0),true),((0,1),false),((0,1),true),((0,2),false),((0,2),true),((1,0),false),((1,0),true),((1,1),false),((1,1),true),((1,2),false),((1,2),true),((2,0),false),((2,0),true),((2,1),false),((2,1),true),((2,2),false),((2,2),true),((3,0),false),((3,0),true),((3,1),false),((3,1),true),((3,2),false),((3,2),true)]
+
+def port (v : V) : Nat := 3 * v.1.val + v.2.val
+
+def assignment (r : Row) (v : V) : Bool := (rows[r.val]!).testBit (port v)
+
+def keep (l : Literal V) : Nat := if l.2 then zeros[port l.1]! else ones[port l.1]!
+
+def cut (C : Cl) (s : Nat) (l : Literal V) : Nat := if l ∈ C then s &&& keep l else s
+
+def privateMask (C : Cl) : Nat := lits.foldl (cut C) fullMask
+
+theorem fullBit (r : Row) : fullMask.testBit r.val = true := by
+  revert r; decide +kernel
+
+theorem keepBit (l : Literal V) (r : Row) :
+    (keep l).testBit r.val = true ↔ assignment r l.1 ≠ l.2 := by
+  revert l r; decide +kernel
+
+theorem listed (l : Literal V) : l ∈ lits := by
+  revert l; decide +kernel
+
+theorem cutList (C : Cl) (s : Nat) (ls : List (Literal V)) (r : Row) :
+    (ls.foldl (cut C) s).testBit r.val = true ↔
+      s.testBit r.val = true ∧ (∀ l ∈ ls, l ∈ C → assignment r l.1 ≠ l.2) := by
+  induction ls generalizing s with
+  | nil => simp
+  | cons l t ih =>
+    rw [List.foldl_cons, ih]
+    by_cases h : l ∈ C
+    · simp only [cut, if_pos h, Nat.testBit_and, Bool.and_eq_true, keepBit,
+        List.mem_cons]
+      aesop
+    · simp only [cut, if_neg h, List.mem_cons]
+      aesop
+
+theorem privateBit (C : Cl) (r : Row) :
+    (privateMask C).testBit r.val = true ↔ ¬ClauseSat (assignment r) C := by
+  rw [privateMask,cutList]
+  simp only [fullBit, true_and]
+  constructor
+  · rintro h ⟨l,hl,yes⟩
+    exact h l (listed l) hl yes
+  · intro h l _ hl yes
+    exact h ⟨l,hl,yes⟩
+
+def posAx (i : Fin 4) : Cl := Finset.univ.image (fun j : Fin 3 => ((i,j),true))
+def negAx (i j : Fin 4) (h : Fin 3) : Cl := {((i,h),false),((j,h),false)}
+
+theorem posListed (i : Fin 4) : privateMask (posAx i) ∈ labelMasks.toList := by
+  revert i; decide +kernel
+
+theorem negListed (i j : Fin 4) (h : Fin 3) (ne : i ≠ j) :
+    privateMask (negAx i j h) ∈ labelMasks.toList := by
+  revert i j h; decide +kernel
+
+theorem axListed {C : Cl} (hc : C ∈ PHP 4 3) : privateMask C ∈ labelMasks.toList := by
+  rcases hc with ⟨i,rfl⟩ | ⟨i,j,h,ne,rfl⟩
+  · exact posListed i
+  · exact negListed i j h ne
+
+def labels : Array Nat := #[0,0,0,0,0,0,1,1,1,1,1,1,2,2,2,2,2,2,3,3,3,3,3,3,4,4,5,5,6,6,7,7,8,8,9,9,10,10,11,11,12,12,13,13,14,14,15,15,16,16,17,17,18,18,19,19,20,20,21,21]
+def negA : Array Nat := #[0,0,0,0,1,2,2,3,3,3,1,2,2,3,3,3,1,2,2,3,3,3]
+def negB : Array Nat := #[0,0,0,0,0,0,1,0,1,2,0,0,1,0,1,2,0,0,1,0,1,2]
+def negH : Array Nat := #[0,1,2,3,0,0,0,0,0,0,1,1,1,1,1,1,2,2,2,2,2,2]
+def neighborData : Array Nat := #[199070,207135,203418,211672,223579,227801,52219084800,56447205376,53358886912,57669582848,60757901312,61897703424,14252007158185984,14806229738061824,14559458097102848,15126668658081792,16499065327976448,16789198958755840,4035837755673286803456,4181123879652259004416,4111894546180319739904,4260585391477584035840,4329814724949523300352,4405871515456556236800,2359299,2883589,1030792151042,1168231104516,962074771456,1099514249216,378302368699121664,414331165718085633,360287970191212544,396316767210438656,324259997804396544,342274465033355264,117440576,167772416,57174604644352,70368744177984,52776658796544,74766975238144,21905508587530092672,25364273101350633664,20752587083057463296,26517194606108475392,23058491664788094976,24211417567441453056,6442450944,8589942784,3377699720531968,3940649673961472,3659182213431296,4222134314336256,1328165573307087732736,1475739525896764149760,1401952549612663341056,1549526502203413495808,1623317982086067912704,1697105239855882829824]
+
+abbrev Label := Fin 22
+
+def labelOf (r : Row) : Label := Fin.ofNat 22 labels[r.val]!
+
+def axiomAt (b : Label) : Cl :=
+  if b.val < 4 then posAx (Fin.ofNat 4 b.val)
+  else negAx (Fin.ofNat 4 (negA[b.val]!)) (Fin.ofNat 4 (negB[b.val]!)) (Fin.ofNat 3 (negH[b.val]!))
+
+def otherRow (r : Row) (v : V) : Row :=
+  Fin.ofNat 60 ((neighborData[r.val]! >>> (6*port v)) % 64)
+
+theorem posAxNamed : ∀ i : Fin 4, ∃ a : Label, axiomAt a = posAx i := by decide +kernel
+theorem negAxNamed : ∀ i j : Fin 4, ∀ h : Fin 3, i ≠ j → ∃ a : Label, axiomAt a = negAx i j h := by decide +kernel
+
+theorem axNamed {C : Cl} (ax : C ∈ PHP 4 3) : ∃ a : Label, axiomAt a = C := by
+  rcases ax with ⟨i,rfl⟩ | ⟨i,j,h,ne,rfl⟩
+  · exact posAxNamed i
+  · exact negAxNamed i j h ne
+
+theorem privateByName : ∀ r : Row, ∀ b : Label,
+    (privateMask (axiomAt b)).testBit r.val = decide (labelOf r = b) := by decide +kernel
+
+theorem axiomFlag (r : Row) (b : Label) :
+    ¬ClauseSat (assignment r) (axiomAt b) ↔ labelOf r = b := by
+  rw [← privateBit,privateByName,decide_eq_true_eq]
+
+theorem everyLabel : ∀ b : Label, ∃ r : Row, labelOf r = b := by decide +kernel
+
+theorem nameUnique {a b : Label} (eq : axiomAt a = axiomAt b) : a = b := by
+  obtain ⟨r,h⟩ := everyLabel a
+  have yes := (axiomFlag r a).2 h
+  rw [eq,axiomFlag] at yes
+  exact h.symm.trans yes
+
+theorem neighborVar : ∀ r : Row, ∀ v : V, ∀ bit : Bool,
+    (v,bit) ∈ axiomAt (labelOf r) →
+    assignment (otherRow r v) v = bit ∧
+    (∀ q : V, q ≠ v → assignment (otherRow r v) q = assignment r q) ∧
+    labelOf (otherRow r v) ≠ labelOf r := by decide +kernel
+
+def Taut (C : Cl) : Prop := ∃ v : V, (v,true) ∈ C ∧ (v,false) ∈ C
+
+theorem falseAtFlip (a b : V → Bool) {D : Cl} {v : V} {t : Bool}
+    (pivot : (v,t) ∈ D) (clean : ¬Taut D) (changed : b v ≠ t)
+    (fixed : ∀ q ≠ v, b q = a q) (prior : ¬ClauseSat a (D.erase (v,t))) :
+    ¬ClauseSat b D := by
+  rintro ⟨⟨q,z⟩,m,hit⟩
+  change b q = z at hit
+  by_cases eq : q = v
+  · subst q
+    cases t <;> cases z
+    · exact changed hit
+    · exact clean ⟨v,m,pivot⟩
+    · exact clean ⟨v,pivot,m⟩
+    · exact changed hit
+  · have mem : (q,z) ∈ D.erase (v,t) := Finset.mem_erase.mpr ⟨by simp [eq],m⟩
+    exact prior ⟨(q,z),mem,(fixed q eq).symm.trans hit⟩
+
+def posRows : Array Nat := #[5,3,4,2,1,0,11,9,10,8,7,6,17,15,16,14,13,12,23,21,22,20,19,18]
+def posIDs : Array Nat := #[5,4,3,1,2,0,11,10,9,7,8,6,17,16,15,13,14,12,23,22,21,19,20,18,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
+def edgeLabels : Array Nat := #[4,10,16,5,11,17,6,12,18,7,13,19,8,14,20,9,15,21]
+def edgeIDs : Array Nat := #[0,0,0,0,0,3,6,9,12,15,1,4,7,10,13,16,2,5,8,11,14,17]
+def segments : Array Nat := #[192,3,1280,20,2560,40,12288,12,81920,33,163840,18,49152,768,135168,2112,73728,1152,786432,48,5242880,10,10485760,5,3145728,3072,8650752,640,4718592,320,12582912,196608,2621440,40960,1310720,20480]
+def ports : Array Nat := #[3,0,4,1,5,2,6,0,7,1,8,2,6,3,7,4,8,5,9,0,10,1,11,2,9,3,10,4,11,5,9,6,10,7,11,8]
+def move (s a : Nat) : Nat :=
+  if a < 36 then s ||| segments[a]! else
+    (List.range 36).foldl (fun t b =>
+      let z := segments[b]!
+      let w := segments[b ^^^ 1]!
+      if ports[b]! + 36 == a && (s &&& z == z || s &&& w == w) then t ||| z else t) s
+
+def Inc (a b : Nat) : Prop := ∀ k, a.testBit k = true → b.testBit k = true
+
+theorem incRefl (a : Nat) : Inc a a := fun _ t => t
+
+theorem incTrans {a b c : Nat} (ab : Inc a b) (bc : Inc b c) : Inc a c :=
+  fun k h => bc k (ab k h)
+
+theorem incIff (a b : Nat) : Inc a b ↔ a &&& b = a := by
+  constructor
+  · intro h
+    apply Nat.eq_of_testBit_eq
+    intro k
+    rw [Nat.testBit_and]
+    cases ha : a.testBit k with
+    | false => rfl
+    | true => simp [h k ha]
+  · intro h k ha
+    have q := congrArg (fun t : Nat => t.testBit k) h
+    simpa [Nat.testBit_and,ha] using q
+
+theorem incOr {a b c d : Nat} (h : Inc a b) (g : Inc c d) : Inc (a ||| c) (b ||| d) := by
+  intro k hk
+  rw [Nat.testBit_or,Bool.or_eq_true] at hk ⊢
+  exact hk.imp (h k) (g k)
+
+theorem incLeft (a b : Nat) : Inc a (a ||| b) := by
+  intro k h; simp [Nat.testBit_or,h]
+
+def gain (s a b acc : Nat) : Nat :=
+  let z := segments[b]!
+  let w := segments[b ^^^ 1]!
+  if ports[b]! + 36 == a && (s &&& z == z || s &&& w == w) then acc ||| z else acc
+
+theorem smallerMark {s t z : Nat} (h : Inc s t) (hz : s &&& z = z) :
+    t &&& z = z := by
+  rw [Nat.and_comm] at hz ⊢
+  exact (incIff z t).1 (incTrans ((incIff z s).2 hz) h)
+
+theorem gainMono {s t x y : Nat} (a b : Nat) (st : Inc s t) (xy : Inc x y) :
+    Inc (gain s a b x) (gain t a b y) := by
+  unfold gain
+  dsimp only
+  split <;> split
+  · exact incOr xy (incRefl _)
+  · rename_i hs ht
+    simp only [Bool.and_eq_true, Bool.or_eq_true,beq_iff_eq] at hs ht
+    exact False.elim (ht ⟨hs.1, hs.2.imp (smallerMark st) (smallerMark st)⟩)
+  · exact incTrans xy (incLeft _ _)
+  · exact xy
+
+theorem moveMono {s t : Nat} (st : Inc s t) (a : Nat) : Inc (move s a) (move t a) := by
+  unfold move
+  split
+  · exact incOr st (incRefl _)
+  · change Inc ((List.range 36).foldl (fun x b => gain s a b x) s)
+               ((List.range 36).foldl (fun y b => gain t a b y) t)
+    generalize List.range 36 = bs
+    have aux (l : List Nat) {u v : Nat} (uv : Inc u v) :
+        Inc (l.foldl (fun x b => gain s a b x) u) (l.foldl (fun y b => gain t a b y) v) := by
+      induction l generalizing u v with
+      | nil => exact uv
+      | cons b l ih => exact ih (gainMono a b st uv)
+    exact aux bs st
+
+
+abbrev PP := Fin 24
+abbrev Edge := Fin 18
+abbrev End := Fin 36
+def positiveRow (p : PP) : Row := Fin.ofNat 60 posRows[p.val]!
+def positiveID (r : Row) : PP := Fin.ofNat 24 posIDs[r.val]!
+def edgeID (a : Label) : Edge := Fin.ofNat 18 edgeIDs[a.val]!
+def edgeName (e : Edge) : Label := Fin.ofNat 22 edgeLabels[e.val]!
+def endEdge (e : End) : Edge := Fin.ofNat 18 (e.val/2)
+def endpoint (a : Label) (v : V) : End :=
+  let b := 2*(edgeID a).val
+  Fin.ofNat 36 (if ports[b]! = port v then b else b+1)
+def seg (e : End) := segments[e.val]!
+def isMarked (s : Nat) (p : PP) := s.testBit p.val = true
+def enabled (s : Nat) (e : Edge) : Prop :=
+  Inc segments[2*e.val]! s ∨ Inc segments[2*e.val+1]! s
+
+theorem positiveLabs : ∀ p : PP, (labelOf (positiveRow p)).val < 4 := by decide +kernel
+theorem canonPos : ∀ r : Row, (labelOf r).val < 4 → positiveRow (positiveID r) = r := by decide +kernel
+theorem edgeLab : ∀ b : Label, 4 ≤ b.val → edgeName (edgeID b) = b := by decide +kernel
+theorem edgeLab2 : ∀ e : Edge, edgeID (edgeName e) = e ∧ 4 ≤ (edgeName e).val := by decide +kernel
+theorem signs : ∀ b : Label, ∀ v : V, ∀ t : Bool, (v,t) ∈ axiomAt b → (t = true ↔ b.val < 4) := by decide +kernel
+theorem endpoints : ∀ b : Label, ∀ v : V, (v,false) ∈ axiomAt b →
+    endEdge (endpoint b v) = edgeID b ∧ ports[(endpoint b v).val]! = port v := by decide +kernel
+theorem posFlip : ∀ p : PP, ∀ v : V, (v,true) ∈ axiomAt (labelOf (positiveRow p)) →
+    let b := labelOf (otherRow (positiveRow p) v)
+    (v,false) ∈ axiomAt b ∧ (seg (endpoint b v)).testBit p.val = true := by decide +kernel
+theorem backPair : ∀ b : Label, ∀ v : V, (v,false) ∈ axiomAt b → ∀ p : PP,
+    (seg (endpoint b v)).testBit p.val = true →
+    let r := otherRow (positiveRow p) v
+    labelOf r = b ∧ otherRow r v = positiveRow p := by decide +kernel
+theorem segSmall : ∀ e : End, seg e < 2^24 := by decide +kernel
+
+theorem incFromPositive (s : Nat) (e : End)
+    (h : ∀ p : PP, (seg e).testBit p.val = true → isMarked s p) : Inc (seg e) s := by
+  intro k hit
+  by_cases sm : k < 24
+  · exact h ⟨k,sm⟩ hit
+  · have dead := Nat.testBit_lt_two_pow (lt_of_lt_of_le (segSmall e)
+        (Nat.pow_le_pow_right (by decide : 0 < 2) (by omega : 24 ≤ k)))
+    simp [dead] at hit
+
+theorem growGain (s a b base : Nat) : Inc base (gain s a b base) := by
+  unfold gain
+  dsimp only
+  split
+  · exact incLeft _ _
+  · exact incRefl _
+
+theorem growFoldGain (s a : Nat) (xs : List Nat) (base : Nat) :
+    Inc base (xs.foldl (fun x b => gain s a b x) base) := by
+  induction xs generalizing base with
+  | nil => exact incRefl _
+  | cons b xs ih => exact incTrans (growGain s a b base) (ih _)
+
+theorem moveGrows (s a : Nat) : Inc s (move s a) := by
+  unfold move
+  split
+  · exact incLeft _ _
+  · exact growFoldGain s a _ s
+
+theorem directGain (s : Nat) (e : End) : Inc (seg e) (move s e.val) := by
+  intro k t
+  simp [seg,move,e.isLt,Nat.testBit_or] at t ⊢
+  exact Or.inr t
+
+theorem portGain (s : Nat) (e : End) (active : enabled s (endEdge e)) :
+    Inc (seg e) (move s (36+ports[e.val]!)) := by
+  have pair : ∀ f : End,
+      (segments[2*(endEdge f).val]! = seg f ∧ segments[2*(endEdge f).val+1]! = segments[f.val ^^^ 1]!) ∨
+      (segments[2*(endEdge f).val+1]! = seg f ∧ segments[2*(endEdge f).val]! = segments[f.val ^^^ 1]!) := by decide +kernel
+  have act : Inc (seg e) s ∨ Inc segments[e.val ^^^ 1]! s := by
+    rcases pair e with ⟨u,v⟩ | ⟨u,v⟩
+    · simpa [enabled,u,v] using active
+    · simpa [enabled,u,v,or_comm] using active
+  have one (x : Nat) : Inc (seg e) (gain s (36+ports[e.val]!) e.val x) := by
+    have flag : s &&& seg e = seg e ∨ s &&& segments[e.val ^^^ 1]! = segments[e.val ^^^ 1]! := by
+      rcases act with h | h
+      · exact Or.inl (by rw [Nat.and_comm]; exact (incIff _ _).1 h)
+      · exact Or.inr (by rw [Nat.and_comm]; exact (incIff _ _).1 h)
+    have yes : ((ports[e.val]! + 36 == 36 + ports[e.val]!) &&
+        (s &&& segments[e.val]! == segments[e.val]! || s &&& segments[e.val ^^^ 1]! == segments[e.val ^^^ 1]!)) = true := by
+      simpa [Bool.and_eq_true,Bool.or_eq_true,seg,Nat.add_comm] using flag
+    intro k m
+    unfold gain
+    dsimp only
+    rw [if_pos yes,Nat.testBit_or,Bool.or_eq_true]
+    exact Or.inr m
+  have loop (xs : List Nat) (x : Nat) (member : e.val ∈ xs) :
+      Inc (seg e) (xs.foldl (fun q b => gain s (36+ports[e.val]!) b q) x) := by
+    induction xs generalizing x with
+    | nil => simp at member
+    | cons b bs ih =>
+      rcases List.mem_cons.mp member with eq | mem
+      · subst b
+        exact incTrans (one x) (growFoldGain s _ _ _)
+      · exact ih _ mem
+  unfold move
+  rw [if_neg (by omega)]
+  exact loop _ _ (List.mem_range.mpr e.isLt)
+
+theorem makesActive (s : Nat) (e : End) (all : Inc (seg e) s) : enabled s (endEdge e) := by
+  have alt : ∀ f : End, segments[2*(endEdge f).val]! = seg f ∨ segments[2*(endEdge f).val+1]! = seg f := by decide +kernel
+  rcases alt e with h | h
+  · exact Or.inl (h ▸ all)
+  · exact Or.inr (h ▸ all)
+
+theorem enabledUp {s t : Nat} (g : Inc s t) (e : Edge) (x : enabled s e) : enabled t e :=
+  x.imp (fun h => incTrans h g) (fun h => incTrans h g)
+
+end PCX150
+
+
+namespace PCX150.Orbits
+
+abbrev Pt := Fin 24
+abbrev Endpt := Fin 36
+abbrev Act := Fin 48
+
+structure Board where
+  cell : Endpt → Pt → Prop
+  opposite : Endpt → Endpt
+  direct : Endpt → Act
+  port : Endpt → Act
+
+def Ready (B : Board) (s : Set Pt) (e : Endpt) : Prop :=
+  (∀ p, B.cell e p → p ∈ s) ∨ (∀ p, B.cell (B.opposite e) p → p ∈ s)
+
+def Step (B : Board) (s : Set Pt) (a : Act) : Set Pt :=
+  {p | p ∈ s ∨ ∃ e, B.cell e p ∧ (B.direct e = a ∨ (B.port e = a ∧ Ready B s e))}
+
+structure Renaming (B : Board) where
+  pt : Equiv.Perm Pt
+  ed : Equiv.Perm Endpt
+  op : Equiv.Perm Act
+  cell : ∀ e p, B.cell e p ↔ B.cell (ed e) (pt p)
+  mate : ∀ e, ed (B.opposite e) = B.opposite (ed e)
+  direct : ∀ e, op (B.direct e) = B.direct (ed e)
+  port : ∀ e, op (B.port e) = B.port (ed e)
+
+def identity (B : Board) : Renaming B :=
+  ⟨Equiv.refl _,Equiv.refl _,Equiv.refl _,fun _ _ => Iff.rfl,fun _ => rfl,fun _ => rfl,fun _ => rfl⟩
+
+def combine {B : Board} (f g : Renaming B) : Renaming B where
+  pt := f.pt.trans g.pt
+  ed := f.ed.trans g.ed
+  op := f.op.trans g.op
+  cell e p := (f.cell e p).trans (g.cell _ _)
+  mate e := (congrArg g.ed (f.mate e)).trans (g.mate _)
+  direct e := (congrArg g.op (f.direct e)).trans (g.direct _)
+  port e := (congrArg g.op (f.port e)).trans (g.port _)
+
+def Below (B : Board) (s t : Set Pt) : Prop :=
+  ∃ f : Renaming B, ∀ p ∈ s, f.pt p ∈ t
+
+theorem belowSubset {B : Board} {s t : Set Pt} (inc : s ⊆ t) : Below B s t :=
+  ⟨identity _,fun _ h => inc h⟩
+
+theorem belowTrans {B : Board} {s t u : Set Pt} (a : Below B s t) (b : Below B t u) :
+    Below B s u := by
+  obtain ⟨f,hf⟩ := a
+  obtain ⟨g,hg⟩ := b
+  exact ⟨combine f g,fun p hp => hg _ (hf p hp)⟩
+
+theorem preserved {B : Board} {s t : Set Pt} (f : Renaming B) (incl : ∀ p ∈ s, f.pt p ∈ t)
+    (a : Act) : ∀ p ∈ Step B s a, f.pt p ∈ Step B t (f.op a) := by
+  have group {e : Endpt} (c : ∀ p, B.cell e p → p ∈ s) : ∀ p, B.cell (f.ed e) p → p ∈ t := by
+    intro p h
+    have hit := (f.cell e (f.pt.symm p)).2 (by simpa using h)
+    simpa using incl _ (c _ hit)
+  intro p h
+  rcases h with old | ⟨e,cell,direct | ⟨port,ready⟩⟩
+  · exact Or.inl (incl p old)
+  · exact Or.inr ⟨f.ed e,(f.cell e p).1 cell,Or.inl ((f.direct e).symm.trans (congrArg f.op direct))⟩
+  · refine Or.inr ⟨f.ed e,(f.cell e p).1 cell,Or.inr ⟨(f.port e).symm.trans (congrArg f.op port),?_⟩⟩
+    rcases ready with left | right
+    · exact Or.inl (group left)
+    · exact Or.inr (by simpa [f.mate e] using group right)
+
+theorem fromFrontier {B : Board} (cap : Nat → Nat → Set Pt) (size : Nat → Nat)
+    (next : ∀ d < 8, ∀ i < size d, ∀ a : Act, ∃ j < size (d+1), Below B (Step B (cap d i) a) (cap (d+1) j))
+    {actual : Type} (marked : actual → Set Pt) (go : actual → Act → actual)
+    (safe : ∀ s a, marked (go s a) ⊆ Step B (marked s) a)
+    (miss : ∀ d ≤ 8, ∀ i < size d, ∃ p, p ∉ cap d i)
+    (start : actual) (initial : ∃ i < size 0, Below B (marked start) (cap 0 i))
+    (as : List Act) (len : as.length ≤ 8) : ¬ ∀ p, p ∈ marked (as.foldl go start) := by
+  have visit (xs : List Act) (d : Nat) (s : actual) (lim : d+xs.length ≤ 8)
+      (atState : ∃ i < size d, Below B (marked s) (cap d i)) :
+      ∃ i < size (d+xs.length), Below B (marked (xs.foldl go s)) (cap (d+xs.length) i) := by
+    induction xs generalizing d s with
+    | nil => simpa using atState
+    | cons a xs ih =>
+      obtain ⟨i,hi,f,embedding⟩ := atState
+      have h : d < 8 := by simp at lim; omega
+      obtain ⟨j,hj,nextState⟩ := next d h i hi (f.op a)
+      have lift : Below B (marked (go s a)) (Step B (cap d i) (f.op a)) :=
+        ⟨f,fun p hp => preserved f embedding a p (safe s a hp)⟩
+      have remain : (d+1)+xs.length ≤ 8 := by
+        simpa [Nat.add_assoc,Nat.add_comm,Nat.add_left_comm] using lim
+      have finish := ih (d+1) (go s a) remain ⟨j,hj,belowTrans lift nextState⟩
+      simpa [Nat.add_assoc,Nat.add_comm,Nat.add_left_comm] using finish
+  obtain ⟨i,hi,f,inc⟩ := visit as 0 start (by simpa using len) initial
+  simp only [Nat.zero_add] at hi inc
+  obtain ⟨p,absent⟩ := miss as.length len i hi
+  intro full
+  exact absent (by simpa using inc (f.pt.symm p) (full _))
+
+end PCX150.Orbits
+
+
+namespace PCX150.Bands
+
+structure Part where
+  destination : Nat
+  distance : Nat
+  down : Bool
+  deriving Inhabited, DecidableEq
+
+def readBit (p : Part) (r : Nat) : Option Nat :=
+  if p.down then some (p.distance + r) else
+  if p.distance ≤ r then some (r-p.distance) else none
+
+def applyPart (p : Part) (m : Nat) : Nat :=
+  p.destination &&& (if p.down then m >>> p.distance else m <<< p.distance)
+
+def roll (ps : List Part) (m : Nat) : Nat :=
+  ps.foldr (fun p t => applyPart p m ||| t) 0
+
+theorem testPart (p : Part) (m r : Nat) :
+    (applyPart p m).testBit r = (p.destination.testBit r &&
+      ((readBit p r).map (fun x => m.testBit x)).getD false) := by
+  by_cases b : p.down = true
+  · simp [applyPart,readBit,b,Nat.testBit_and,Nat.testBit_shiftRight,Nat.add_comm]
+  · by_cases d : p.distance ≤ r <;>
+      simp [applyPart,readBit,b,d,Nat.testBit_and,Nat.testBit_shiftLeft]
+
+theorem rollBit (ps : List Part) (m r : Nat) :
+    (roll ps m).testBit r = true ↔
+      ∃ p ∈ ps, p.destination.testBit r = true ∧ ∃ x, readBit p r = some x ∧ m.testBit x = true := by
+  induction ps with
+  | nil => simp [roll]
+  | cons p ps ih =>
+    change ((applyPart p m ||| roll ps m).testBit r = true) ↔ _
+    rw [Nat.testBit_or,Bool.or_eq_true,testPart,Bool.and_eq_true,ih]
+    simp only [List.mem_cons]
+    cases h : readBit p r with
+    | none => simp [h]
+    | some k => simp [h]
+
+def routes (ps : List Part) (r src : Nat) : Prop :=
+  (∃ p ∈ ps, p.destination.testBit r = true) ∧
+  ∀ p ∈ ps, p.destination.testBit r = true → readBit p r = some src
+
+instance (ps : List Part) (r src : Nat) : Decidable (routes ps r src) := by
+  unfold routes
+  infer_instance
+
+theorem rollCorrect {ps : List Part} {r src : Nat} (h : routes ps r src) (m : Nat) :
+    (roll ps m).testBit r = m.testBit src := by
+  apply Bool.eq_iff_iff.mpr
+  rw [rollBit]
+  constructor
+  · rintro ⟨p,mem,y,x,hx,val⟩
+    rw [h.2 p mem y] at hx
+    have e := Option.some.inj hx
+    simpa [e] using val
+  · intro bit
+    obtain ⟨p,mem,y⟩ := h.1
+    exact ⟨p,mem,y,src,h.2 p mem y,bit⟩
+
+end PCX150.Bands
+
+namespace PCX150.OrbitCert
+open PCX150.Orbits
+abbrev PermID := Fin 144
+def asPoints (s : Nat) : Set Pt := {x : Pt | s.testBit x.val = true}
+def flipEnd (e : Endpt) : Endpt := Fin.ofNat 36 (e.val ^^^ 1)
+def dr (e : Endpt) : Act := Fin.ofNat 48 e.val
+def pa (e : Endpt) : Act := Fin.ofNat 48 (36+ports[e.val]!)
+def board : Board := ⟨fun e p => (seg e).testBit p.val = true,flipEnd,dr,pa⟩
+
+theorem endValues : ∀ e : Endpt,
+    (flipEnd e).val = e.val ^^^ 1 ∧ endEdge (flipEnd e) = endEdge e ∧
+    (dr e).val = e.val ∧ (pa e).val = 36 + ports[e.val]! := by decide +kernel
+
+theorem stepToMove (s : Nat) (a : Act) : Orbits.Step board (asPoints s) a ⊆ asPoints (move s a.val) := by
+  intro p h
+  rcases h with old | ⟨e,inGroup,dir | ⟨port,act⟩⟩
+  · exact moveGrows _ _ _ old
+  · change dr e = a at dir
+    rw [← dir,(endValues e).2.2.1]
+    exact directGain s e _ inGroup
+  · change pa e = a at port
+    rw [← port,(endValues e).2.2.2]
+    have ready : enabled s (endEdge e) := by
+      rcases act with m | m
+      · exact makesActive s e (incFromPositive s e m)
+      · have f := makesActive s (flipEnd e) (incFromPositive s (flipEnd e) m)
+        rw [(endValues e).2.1] at f
+        exact f
+    exact portGain s e ready _ inGroup
+
+theorem moveToStep (s : Nat) (a : Act) : asPoints (move s a.val) ⊆ Orbits.Step board (asPoints s) a := by
+  intro p hit
+  change (move s a.val).testBit p.val = true at hit
+  unfold move at hit
+  by_cases sm : a.val < 36
+  · rw [if_pos sm,Nat.testBit_or,Bool.or_eq_true] at hit
+    rcases hit with old | new
+    · exact Or.inl old
+    · let e : Endpt := ⟨a.val,sm⟩
+      exact Or.inr ⟨e,new,Or.inl (Fin.ext (endValues e).2.2.1)⟩
+  · rw [if_neg sm] at hit
+    have accumulate (ls : List Nat) (acc : Nat)
+        (ok : ∀ b ∈ ls, b < 36) (prior : acc.testBit p.val = true → p ∈ Orbits.Step board (asPoints s) a) :
+        (ls.foldl (fun x b => gain s a.val b x) acc).testBit p.val = true →
+        p ∈ Orbits.Step board (asPoints s) a := by
+      induction ls generalizing acc with
+      | nil => exact prior
+      | cons b bs ih =>
+        apply ih (gain s a.val b acc) (fun k hk => ok k (List.mem_cons_of_mem _ hk))
+        intro m
+        unfold gain at m
+        dsimp only at m
+        split at m
+        · next active =>
+          rw [Nat.testBit_or,Bool.or_eq_true] at m
+          rcases m with m | m
+          · exact prior m
+          · have hcond := Bool.and_eq_true_iff.mp active
+            let e : Endpt := ⟨b,ok b (by simp)⟩
+            refine Or.inr ⟨e,m,Or.inr ⟨?_,?_⟩⟩
+            · apply Fin.ext
+              change (pa e).val = a.val
+              rw [(endValues e).2.2.2]
+              simpa [Nat.add_comm,e] using eq_of_beq hcond.1
+            · rcases Bool.or_eq_true_iff.mp hcond.2 with c | c
+              · left
+                have sub : Inc (seg e) s := (incIff _ _).2 (by rw [Nat.and_comm]; exact eq_of_beq c)
+                exact fun x hx => sub _ hx
+              · right
+                have sub : Inc (seg (flipEnd e)) s := by
+                  apply (incIff _ _).2
+                  rw [Nat.and_comm,seg,(endValues e).1]
+                  exact eq_of_beq c
+                exact fun x hx => sub _ hx
+        · exact prior m
+    exact accumulate (List.range 36) s (fun _ h => List.mem_range.mp h) (fun h => Or.inl h) hit
+
+def fwdP : Array Nat := #[984818244535754528103549039458486304,944538608299847986500403370965142529,897925987729709445193067719042433154,817248823751965341631608214824948804,855050282290280226185489701320918179,774451712649823469527475641923965029,727548310346908890193318370647117825,687268674111002348590172768725767200,640656053540863807427936268062917700,559978889563119703761870460137016450,597780348101434588422607851133927525,517181778460977831729725112596826275,899228972693802420046595671804903522,858949413210178314137027047122273347,979624724271934868716641261387384992,778344703343642119513340998535155717,939342631960572607064525498424134785,818543212339642882784000577896551460,470278375838750734089249303281407043,429998739602844263967236986984632418,383386119188504749994515175401622533,302708955098440483087282144825935008,340510413751491021445174582066546724,259911844073594305646747150145618049,641959038185644263942526604439192740,601679478702020229514091265381138565,722354789919575811283220168726089825,521074768878962898838752683224074275,682072697610629040087092229356753984,561273277952259356701022615445343234,384689103996798626032295935627824261,344409544513174591603860663141763236,465084855730730173518088717746574371,263804834690117260969014928536141921,424802763421783402324210379169763330,304003343763413718903272086118204480,944494360608982600091689407077458150,984695325755319287546873440518808775,817407393967625164429978881601411400,897809209131874778578179199847312650,774612738938523521916508678826302825,855014630855055643239487496163404075,687224426420136962181458738266089671,727425391566473649636642838279433446,560137459778779526664847430621895946,640539274943029140708441445159380296,517342804749677884153626828639312171,597744696666210005441736966836265321,813516858823811984161462297925228840,773315893677402028544592263065574665,940603825265885738527917141336072550,860202010101379685813815818126108875,983398480215200640361599069866796359,902996588298485348634405248983936234,213008441330478172133867088857345289,172728805094644898692407421782305064,126116184723716770518641450506495179,45439020746229105523082951253073254,83240479364074292190851707029364970,2641909723800705937052651178170695,556246924315653828057393230559518058,516045959169243943921656481324439883,683333890913526681094496048674777383,602932075636700465139227502815027433,726128545865257073384165800799415558,645726653911101822551427286532728008,127419169488526064076913721203762507,87139610004975226329031097939435882,207814921265942194042214992851447017,6534900337905883404815734963280167,167532829034366673069887504132581576,46733409413620119193577587150757126,858782246738992164206556033197783468,899061806222543001954438656462110093,778386494961576034241254761550098958,979666515889612344878654019438265808,818668587193151555213582250268964399,939468006813898109089892167250788849,429954491911864400226076523842027917,470155457058274284361813273077106092,302867525313991547188973705726768592,383269340590817763144242251586518542,260072870362261154899303953602130417,340474762316416405732042467868817967,773192974897040056149602665544200686,813472611132873329591062332619240911,860085231503801457764828303895050796,940762395481289122760386803148472721,902960936863443936092618047372181005,983559506503717522346417103223375280,172684557403706244122007456476317135,212885522550116199738877491335971310,45597590961632489755552613065473425,125999406126138542469653936275437100,2802936012317587921870684534749616,83204827929032879649064505417609741,298976989807381266102011016135456304,258776024661044578646826916122112529,426063956448738701618622323779650029,345662141284489087575028309242165679,468858611477840344129842925762233804,388456719561308222841732787565280654,41707055618535628191780347324087825,1506090472198940736596313882737200,168794022259893063853490872800134575,88392207095643449705290554554233325,211588677288994706366961075575243150,131186785372462585043982258238141900,601512312230719602251173818773721714,641791871714343636679609091259782739,521116560496788054765381036654971604,722396581537400967314454825865404054,561398652805734825959259375231782645,682198072464104509380197668283341495,344242378041873964340943149962353235,384521937525497998769378489020407410,263846626307942417000249585675456150,465126647348555329444717071177471700,304128718616889188196377525044791991,424928138275258871582447138956202741,515923040388767494194220451120138932,556202676624673964316232767416913557,602815297039013478288954578999923442,683492461129077745196187609575610967,645691002476027206838295172334999251,726289572153923922636722604255927926,86972443533715808236874082596642453,127252003017339914146442707279272628,6576691955583359566828493014160983,207856712883876108770128755866390258,46858784266945621218944255977411190,167658203887875345499469176504994515,258653105880609338090151383754428150,298932742116515879693296985675778775,345545362686654420855533486338628275,426222526664398524521599294264529525,388421068126083639860861903267618450,469019637766540396553744641804719700,1383171691763700179920714943059671,41662807927670241783066383436403446,88275428497808783090402035359112821,168952592475552886651861539576597171,131151133937238002097980053080627796,211749703577694758755994112477580946]
+def invP : Array Nat := #[984818244535754528103549039458486304,944538608299847986500403370965142529,897925987729709445193067719042433154,855050282290280226185489701320918179,817248823751965341631608214824948804,774451712649823469527475641923965029,727548310346908890193318370647117825,687268674111002348590172768725767200,640656053540863807427936268062917700,597780348101434588422607851133927525,559978889563119703761870460137016450,517181778460977831729725112596826275,899228972693802420046595671804903522,858949413210178314137027047122273347,979624724271934868716641261387384992,939342631960572607064525498424134785,778344703343642119513340998535155717,818543212339642882784000577896551460,641959038185644263942526604439192740,601679478702020229514091265381138565,722354789919575811283220168726089825,682072697610629040087092229356753984,521074768878962898838752683224074275,561273277952259356701022615445343234,470278375838750734089249303281407043,429998739602844263967236986984632418,383386119188504749994515175401622533,340510413751491021445174582066546724,302708955098440483087282144825935008,259911844073594305646747150145618049,384689103996798626032295935627824261,344409544513174591603860663141763236,465084855730730173518088717746574371,424802763421783402324210379169763330,263804834690117260969014928536141921,304003343763413718903272086118204480,944494360608982600091689407077458150,984695325755319287546873440518808775,817407393967625164429978881601411400,774612738938523521916508678826302825,897809209131874778578179199847312650,855014630855055643239487496163404075,687224426420136962181458738266089671,727425391566473649636642838279433446,560137459778779526664847430621895946,517342804749677884153626828639312171,640539274943029140708441445159380296,597744696666210005441736966836265321,858782246738992164206556033197783468,899061806222543001954438656462110093,778386494961576034241254761550098958,818668587193151555213582250268964399,979666515889612344878654019438265808,939468006813898109089892167250788849,601512312230719602251173818773721714,641791871714343636679609091259782739,521116560496788054765381036654971604,561398652805734825959259375231782645,722396581537400967314454825865404054,682198072464104509380197668283341495,429954491911864400226076523842027917,470155457058274284361813273077106092,302867525313991547188973705726768592,260072870362261154899303953602130417,383269340590817763144242251586518542,340474762316416405732042467868817967,344242378041873964340943149962353235,384521937525497998769378489020407410,263846626307942417000249585675456150,304128718616889188196377525044791991,465126647348555329444717071177471700,424928138275258871582447138956202741,813516858823811984161462297925228840,773315893677402028544592263065574665,940603825265885738527917141336072550,983398480215200640361599069866796359,860202010101379685813815818126108875,902996588298485348634405248983936234,556246924315653828057393230559518058,516045959169243943921656481324439883,683333890913526681094496048674777383,726128545865257073384165800799415558,602932075636700465139227502815027433,645726653911101822551427286532728008,773192974897040056149602665544200686,813472611132873329591062332619240911,860085231503801457764828303895050796,902960936863443936092618047372181005,940762395481289122760386803148472721,983559506503717522346417103223375280,515923040388767494194220451120138932,556202676624673964316232767416913557,602815297039013478288954578999923442,645691002476027206838295172334999251,683492461129077745196187609575610967,726289572153923922636722604255927926,298976989807381266102011016135456304,258776024661044578646826916122112529,426063956448738701618622323779650029,468858611477840344129842925762233804,345662141284489087575028309242165679,388456719561308222841732787565280654,258653105880609338090151383754428150,298932742116515879693296985675778775,345545362686654420855533486338628275,388421068126083639860861903267618450,426222526664398524521599294264529525,469019637766540396553744641804719700,213008441330478172133867088857345289,172728805094644898692407421782305064,126116184723716770518641450506495179,83240479364074292190851707029364970,45439020746229105523082951253073254,2641909723800705937052651178170695,127419169488526064076913721203762507,87139610004975226329031097939435882,207814921265942194042214992851447017,167532829034366673069887504132581576,6534900337905883404815734963280167,46733409413620119193577587150757126,172684557403706244122007456476317135,212885522550116199738877491335971310,45597590961632489755552613065473425,2802936012317587921870684534749616,125999406126138542469653936275437100,83204827929032879649064505417609741,86972443533715808236874082596642453,127252003017339914146442707279272628,6576691955583359566828493014160983,46858784266945621218944255977411190,207856712883876108770128755866390258,167658203887875345499469176504994515,41707055618535628191780347324087825,1506090472198940736596313882737200,168794022259893063853490872800134575,211588677288994706366961075575243150,88392207095643449705290554554233325,131186785372462585043982258238141900,1383171691763700179920714943059671,41662807927670241783066383436403446,88275428497808783090402035359112821,131151133937238002097980053080627796,168952592475552886651861539576597171,211749703577694758755994112477580946]
+def fwdA : Array Nat := #[370893620502133650990156577101181578910897003366124777934939121089380728434643182559296,363244332559277043180026409267680544791683037667015028457459766010705892803399331889216,370774100378026516493123344625695200337931618733700386948444795492137368281103926034626,355475524492313300872863008958693132099503687335480887993486085334787697018616224694466,363005292311062774185959944316707787645752268402166246484471114816219172496320818839876,355356004368206166375829776483206753526538302703056497006991759737544336865076968169796,347211742304903007211315772588899800159297243060854245729479266007706932032242440740928,339562454362046399401185604755398766040083277361744496251999910929032096400998590070848,347092222180795872714282540113413421586331858428429854742984940410463571878703184216258,331793646295082657094022204446411353347903927030210355788026230253113900616215482876098,339323414113832130407119139804426008894152508096895714279011259734545376093920077021508,331674126170975522596988971970924974774938542397785964801531904655870540462676226351428,370893530162937647150105276762864524465808805951682105162612836876026895683728871555526,363244242220081039339975108929363490346594840252572355685133481797352060052485020885446,370774010038830512653072044287378145892843421319257714176118511278783535530189615030856,355475434153117297032811708620376077654415489921038215221159801121433864267701913690696,363005201971866770345908643978390733200664070987723573712144830602865339745406507836106,355355914029010162535778476144889699081450105288613824234665475524190504114162657166026,323529773768476359592425287927403658948344269183717261781143850281908970504340623360454,315880485825619751782295120093902624829130303484607512303664495203234134873096772690374,323410253644369225095392055451917280375378884551292870794649524684665610350801366835784,308111677758656009475131719784915212136950953153073371839690814527315939088313665495624,315641445577405482788228655142929867683199534219758730330675844008747414566018259641034,307992157634548874978098487309428833563985568520648980853196488930072578934774408970954,347211561626510999531204762359304857093793253556490786931717632673104732638019195323602,339562273683654391721074594525803822974579287857381037454238277594429897006775344653522,347092041502403865034171529883818478520827868924066395945223307075861372484479938798932,331793465616690649413911194216816410282399937525846896990264596918511701221992237458772,339323233435440122727008129574831065828648518592532255481249626399943176699696831604182,331673945492583514916877961741330031709434552893422506003770271321268341068452980934102,323529683429280355752363957847023224294149766193016288792733019781176666252083107022034,315880395486423747942233790013522190174935800493906539315253664702501830620839256351954,323410163305173221255330725371536845721184381560591897806238694183933306098543850497364,308111587419460005635070389704534777482756450162372398851279984026583634836056149157204,315641355238209478948167325062549433029005031229057757342265013508015110313760743302614,307992067295352871138037157229048398909791065529948007864785658429340274682516892632534,370893620501789034306181967568746602279336257812455951804715997181043309629992774152193,363244332558932426496051799735245568160122292113346202327236642102368473998748923482113,370774100377681899809148735093260223706370873180031560818221671583799949476453517627523,355475524491968684188888399426258155467942941781812061863262961426450278213965816287363,363005292310718157501985334784272811014191522848497420354247990907881753691670410432773,355356004367861549691855166950771776894977557149387670876768635829206918060426559762693,347211742304558390527341163056464823527736497507185419599256142099369513227592032333825,339562454361701782717210995222963789408522531808075670121776787020694677596348181663745,347092222180451256030307930580978444954771112874761028612761816502126153074052775809155,331793646294738040410047594913976376716343181476541529657803106344776481811565074468995,339323414113487513723144530271991032262591762543226888148788135826207957289269668614405,331674126170630905913014362438489998143377796844117138671308780747533121658025817944325,370893439823397026626079366892112493389159862983570606265056021887396905571511139361612,363244151880540418815949199058611459269945897284460856787576666808722069940267288691532,370773919699289892129046134416626114816194478351146215278561696290153545417971882836942,355475343813576676508785798749624046577766546952926716323602986132803874155484181496782,363005111632326149821882734107638702124015128019612074814588015614235349633188775642192,355355823689469542011752566274137668004801162320502325337108660535560514001944924972112,299847805231705095289560193733472564682685023926563266496589917123099340944490303906636,292198517288848487479430025899971530563471058227453517019110562044424505313246453236556,299728285107597960792526961257986186109719639294138875510095591525855980790951047381966,284429709221884745172266625590984117871291707895919376555136881368506309528463346041806,291959477040634218485363560948998773417540288962604735046121910849937785006167940187216,284310189097777610675233393115497739298326323263494985568642555771262949374924089517136,347211471286970379007178852488552826017144310588379288034160817684474742525801463129688,339562183344113771197048684655051791897930344889269538556681462605799906894557612459608,347091951162863244510145620013066447444178925955954897047666492087231382372262206605018,331793375277150028889885284346064379205750994557735398092707781929881711109774505264858,339323143095899502202982219704079034751999575624420756583692811411313186587479099410268,331673855153042894392852051870578000632785609925311007106213456332638350956235248740188,299847714892509091449498863653092130028490520935862293508179086622367036692232787568216,292198426949652483639368695819591095909276555236752544030699731543692201060988936898136,299728194768401956952465631177605751455525136303437902521684761025123676538693531043546,284429618882688741332205295510603683217097204905218403566726050867774005276205829703386,291959386701438214645302230868618338763345785971903762057711080349205480753910423848796,284310098758581606835172063035117304644131820272794012580231725270530645122666573178716,370893530162248413782156057697994571202687314844344452907159182192413319517775041958279,363244242219391805972025889864493537083473349145234703429679827113738483886531191288199,370774010038141279285122825222508192629721930211920061920664856595169959364235785433609,355475434152428063664862489555506124391293998813700562965706146437820288101748084093449,363005201971177536977959424913520779937542579880385921456691175919251763579452678238859,355355914028320929167829257080019745818328614181276171979211820840576927948208827568779,323529773767787126224476068862533729262077252250031424314702208940559883667741712880007,315880485824930518414345901029032695142863286550921674837222853861885048036497862209927,323410253643679991727442836387047350689111867617607033328207883343316523514202456355337,308111677757966776107182500720045282450683936219387534373249173185966852251714755015177,315641445576716249420279436078059937996932517286072892864234202667398327729419349160587,307992157633859641610149268244558903877718551586963143386754847588723492098175498490507,370893439823052409942104757359677516757599117429901780134832897979059486766860730954509,363244151880195802131974589526176482638385151730792030657353542900384651135616880284429,370773919698945275445071524884191138184633732797477389148338572381816126613321474429839,355475343813232059824811189217189069946205801399257890193379862224466455350833773089679,363005111631981533137908124575203725492454382465943248684364891705897930828538367235089,355355823689124925327777956741702691373240416766833499206885536627223095197294516565009,299847805231360478605585584201037588051124278372894440366366793214761922139839895499533,292198517288503870795455416367536553931910312673784690888887438136087086508596044829453,299728285107253344108552351725551209478158893740470049379872467617518561986300638974863,284429709221540128488292016058549141239730962342250550424913757460168890723812937634703,291959477040289601801388951416563796785979543408935908915898786941600366201517531780113,284310189097432993991258783583062762666765577709826159438419431862925530570273681110033,323529502750199114704313758294621731751485065331225292749606884525665112965951143675870,315880214807342506894183590461120697632271099632115543272127529446990277334707293005790,323409982626091980207280525819135353178519680698800901763112558928421752812411887151200,308111406740378764587020190152133284940091749300581402808153848771072081549924185811040,315641174559128237900117125510147940486340330367266761299138878252503557027628779956450,307991886616271630089986957676646906367126364668157011821659523173828721396384929286370,299847624552968470925472953782340098951841577967750794610622271633737046580015055374302,292198336610111863115342785948839064832627612268641045133142916555062210948771204704222,299728104428861336428439721306853720378876193335326403624127946036493686426475798849632,284429528543148120808179385639851652140448261937106904669169235879144015163988097509472,291959296361897594121276320997866307686696843003792263160154265360575490641692691654882,284310008419040986311146153164365273567482877304682513682674910281900655010448840984802,347211561625477149479280933761999804824009222375101079346253272504559889007446326334611,339562273682620541669150765928498770704795256675991329868773917425885053376202475664531,347092041501370014982247701286513426251043837742676688359758946907316528853907069809941,331793465615656799361987365619511358012615906344457189404800236749966857591419368469781,339323233434406272675084300977526013558864487411142547895785266231398333069123962615191,331673945491549664864954133144024979439650521712032798418305911152723497437880111945111,323529683428246505700440129249718172024365735011626581207268659612631822621510238033043,315880395485389897890309961416217137905151769312516831729789304533956986990266387362963,323410163304139371203406896774231793451400350379202190220774334015388462467970981508373,308111587418426155583146561107229725212972418980982691265815623858038791205483280168213,315641355237175628896243496465244380759221000047668049756800653339470266683187874313623,307992067294319021086113328631743346640007034348558300279321298260795431051944023643543,347211471286281145639229633423682750378921024960658406573926988291206056256532015330841,339562183343424537829099465590181716259707059261548657096447633212531220625288164660761,347091951162174011142196400948196371805955640328234015587432662693962696102992758806171,331793375276460795521936065281194303567527708930014516632473952536613024840505057466011,339323143095210268835033000639208959113776289996699875123458982018044500318209651611421,331673855152353661024902832805707924994562324297590125645979626939369664686965800941341,299847714891819858081549644588222030813412761134489597258933243886833861093608420652569,292198426948963250271419476754720996694198795435379847781453888808159025462364569982489,299728194767712723584516412112735652240447376502065206272438918289590500940069164127899,284429618881999507964256076445733584002019445103845707317480208132240829677581462787739,291959386700748981277353011803748239548268026170531065808465237613672305155286056933149,284310098757892373467222843970247205429054060471421316330985882534997469524042206263069,323529502749854498020339148762186609167968051083521422625591572565408094728630197950367,315880214806997890210208980928685575048754085384411673148112217486733259097386347280287,323409982625747363523305916286700230595002666451097031639097246968164734575090941425697,308111406740034147903045580619698162356574735052877532684138536810815063312603240085537,315641174558783621216142515977712817902823316119562891175123566292246538790307834230947,307991886615927013406012348144211783783609350420453141697644211213571703159063983560867,299847624552623854241498344249904976368324563720046924486606959673480028342694109648799,292198336609767246431368176416403942249110598020937175009127604594805192711450258978719,299728104428516719744465111774418597795359179087622533500112634076236668189154853124129,284429528542803504124204776107416529556931247689403034545153923918886996926667151783969,291959296361552977437301711465431185103179828756088393036138953400318472404371745929379,284310008418696369627171543631930150983965863056978643558659598321643636773127895259299]
+def invA : Array Nat := #[370893620502133650990156577101181578910897003366124777934939121089380728434643182559296,363244332559277043180026409267680544791683037667015028457459766010705892803399331889216,370774100378026516493123344625695200337931618733700386948444795492137368281103926034626,363005292311062774185959944316707787645752268402166246484471114816219172496320818839876,355475524492313300872863008958693132099503687335480887993486085334787697018616224694466,355356004368206166375829776483206753526538302703056497006991759737544336865076968169796,347211742304903007211315772588899800159297243060854245729479266007706932032242440740928,339562454362046399401185604755398766040083277361744496251999910929032096400998590070848,347092222180795872714282540113413421586331858428429854742984940410463571878703184216258,339323414113832130407119139804426008894152508096895714279011259734545376093920077021508,331793646295082657094022204446411353347903927030210355788026230253113900616215482876098,331674126170975522596988971970924974774938542397785964801531904655870540462676226351428,370893530162937647150105276762864524465808805951682105162612836876026895683728871555526,363244242220081039339975108929363490346594840252572355685133481797352060052485020885446,370774010038830512653072044287378145892843421319257714176118511278783535530189615030856,363005201971866770345908643978390733200664070987723573712144830602865339745406507836106,355475434153117297032811708620376077654415489921038215221159801121433864267701913690696,355355914029010162535778476144889699081450105288613824234665475524190504114162657166026,347211561626510999531204762359304857093793253556490786931717632673104732638019195323602,339562273683654391721074594525803822974579287857381037454238277594429897006775344653522,347092041502403865034171529883818478520827868924066395945223307075861372484479938798932,339323233435440122727008129574831065828648518592532255481249626399943176699696831604182,331793465616690649413911194216816410282399937525846896990264596918511701221992237458772,331673945492583514916877961741330031709434552893422506003770271321268341068452980934102,323529773768476359592425287927403658948344269183717261781143850281908970504340623360454,315880485825619751782295120093902624829130303484607512303664495203234134873096772690374,323410253644369225095392055451917280375378884551292870794649524684665610350801366835784,315641445577405482788228655142929867683199534219758730330675844008747414566018259641034,308111677758656009475131719784915212136950953153073371839690814527315939088313665495624,307992157634548874978098487309428833563985568520648980853196488930072578934774408970954,323529683429280355752363957847023224294149766193016288792733019781176666252083107022034,315880395486423747942233790013522190174935800493906539315253664702501830620839256351954,323410163305173221255330725371536845721184381560591897806238694183933306098543850497364,315641355238209478948167325062549433029005031229057757342265013508015110313760743302614,308111587419460005635070389704534777482756450162372398851279984026583634836056149157204,307992067295352871138037157229048398909791065529948007864785658429340274682516892632534,370893620501789034306181967568746602279336257812455951804715997181043309629992774152193,363244332558932426496051799735245568160122292113346202327236642102368473998748923482113,370774100377681899809148735093260223706370873180031560818221671583799949476453517627523,363005292310718157501985334784272811014191522848497420354247990907881753691670410432773,355475524491968684188888399426258155467942941781812061863262961426450278213965816287363,355356004367861549691855166950771776894977557149387670876768635829206918060426559762693,347211742304558390527341163056464823527736497507185419599256142099369513227592032333825,339562454361701782717210995222963789408522531808075670121776787020694677596348181663745,347092222180451256030307930580978444954771112874761028612761816502126153074052775809155,339323414113487513723144530271991032262591762543226888148788135826207957289269668614405,331793646294738040410047594913976376716343181476541529657803106344776481811565074468995,331674126170630905913014362438489998143377796844117138671308780747533121658025817944325,370893530162248413782156057697994571202687314844344452907159182192413319517775041958279,363244242219391805972025889864493537083473349145234703429679827113738483886531191288199,370774010038141279285122825222508192629721930211920061920664856595169959364235785433609,363005201971177536977959424913520779937542579880385921456691175919251763579452678238859,355475434152428063664862489555506124391293998813700562965706146437820288101748084093449,355355914028320929167829257080019745818328614181276171979211820840576927948208827568779,347211561625477149479280933761999804824009222375101079346253272504559889007446326334611,339562273682620541669150765928498770704795256675991329868773917425885053376202475664531,347092041501370014982247701286513426251043837742676688359758946907316528853907069809941,339323233434406272675084300977526013558864487411142547895785266231398333069123962615191,331793465615656799361987365619511358012615906344457189404800236749966857591419368469781,331673945491549664864954133144024979439650521712032798418305911152723497437880111945111,323529773767787126224476068862533729262077252250031424314702208940559883667741712880007,315880485824930518414345901029032695142863286550921674837222853861885048036497862209927,323410253643679991727442836387047350689111867617607033328207883343316523514202456355337,315641445576716249420279436078059937996932517286072892864234202667398327729419349160587,308111677757966776107182500720045282450683936219387534373249173185966852251714755015177,307992157633859641610149268244558903877718551586963143386754847588723492098175498490507,323529683428246505700440129249718172024365735011626581207268659612631822621510238033043,315880395485389897890309961416217137905151769312516831729789304533956986990266387362963,323410163304139371203406896774231793451400350379202190220774334015388462467970981508373,315641355237175628896243496465244380759221000047668049756800653339470266683187874313623,308111587418426155583146561107229725212972418980982691265815623858038791205483280168213,307992067294319021086113328631743346640007034348558300279321298260795431051944023643543,370893439823397026626079366892112493389159862983570606265056021887396905571511139361612,363244151880540418815949199058611459269945897284460856787576666808722069940267288691532,370773919699289892129046134416626114816194478351146215278561696290153545417971882836942,363005111632326149821882734107638702124015128019612074814588015614235349633188775642192,355475343813576676508785798749624046577766546952926716323602986132803874155484181496782,355355823689469542011752566274137668004801162320502325337108660535560514001944924972112,347211471286970379007178852488552826017144310588379288034160817684474742525801463129688,339562183344113771197048684655051791897930344889269538556681462605799906894557612459608,347091951162863244510145620013066447444178925955954897047666492087231382372262206605018,339323143095899502202982219704079034751999575624420756583692811411313186587479099410268,331793375277150028889885284346064379205750994557735398092707781929881711109774505264858,331673855153042894392852051870578000632785609925311007106213456332638350956235248740188,370893439823052409942104757359677516757599117429901780134832897979059486766860730954509,363244151880195802131974589526176482638385151730792030657353542900384651135616880284429,370773919698945275445071524884191138184633732797477389148338572381816126613321474429839,363005111631981533137908124575203725492454382465943248684364891705897930828538367235089,355475343813232059824811189217189069946205801399257890193379862224466455350833773089679,355355823689124925327777956741702691373240416766833499206885536627223095197294516565009,347211471286281145639229633423682750378921024960658406573926988291206056256532015330841,339562183343424537829099465590181716259707059261548657096447633212531220625288164660761,347091951162174011142196400948196371805955640328234015587432662693962696102992758806171,339323143095210268835033000639208959113776289996699875123458982018044500318209651611421,331793375276460795521936065281194303567527708930014516632473952536613024840505057466011,331673855152353661024902832805707924994562324297590125645979626939369664686965800941341,323529502750199114704313758294621731751485065331225292749606884525665112965951143675870,315880214807342506894183590461120697632271099632115543272127529446990277334707293005790,323409982626091980207280525819135353178519680698800901763112558928421752812411887151200,315641174559128237900117125510147940486340330367266761299138878252503557027628779956450,308111406740378764587020190152133284940091749300581402808153848771072081549924185811040,307991886616271630089986957676646906367126364668157011821659523173828721396384929286370,323529502749854498020339148762186609167968051083521422625591572565408094728630197950367,315880214806997890210208980928685575048754085384411673148112217486733259097386347280287,323409982625747363523305916286700230595002666451097031639097246968164734575090941425697,315641174558783621216142515977712817902823316119562891175123566292246538790307834230947,308111406740034147903045580619698162356574735052877532684138536810815063312603240085537,307991886615927013406012348144211783783609350420453141697644211213571703159063983560867,299847805231705095289560193733472564682685023926563266496589917123099340944490303906636,292198517288848487479430025899971530563471058227453517019110562044424505313246453236556,299728285107597960792526961257986186109719639294138875510095591525855980790951047381966,291959477040634218485363560948998773417540288962604735046121910849937785006167940187216,284429709221884745172266625590984117871291707895919376555136881368506309528463346041806,284310189097777610675233393115497739298326323263494985568642555771262949374924089517136,299847714892509091449498863653092130028490520935862293508179086622367036692232787568216,292198426949652483639368695819591095909276555236752544030699731543692201060988936898136,299728194768401956952465631177605751455525136303437902521684761025123676538693531043546,291959386701438214645302230868618338763345785971903762057711080349205480753910423848796,284429618882688741332205295510603683217097204905218403566726050867774005276205829703386,284310098758581606835172063035117304644131820272794012580231725270530645122666573178716,299847805231360478605585584201037588051124278372894440366366793214761922139839895499533,292198517288503870795455416367536553931910312673784690888887438136087086508596044829453,299728285107253344108552351725551209478158893740470049379872467617518561986300638974863,291959477040289601801388951416563796785979543408935908915898786941600366201517531780113,284429709221540128488292016058549141239730962342250550424913757460168890723812937634703,284310189097432993991258783583062762666765577709826159438419431862925530570273681110033,299847714891819858081549644588222030813412761134489597258933243886833861093608420652569,292198426948963250271419476754720996694198795435379847781453888808159025462364569982489,299728194767712723584516412112735652240447376502065206272438918289590500940069164127899,291959386700748981277353011803748239548268026170531065808465237613672305155286056933149,284429618881999507964256076445733584002019445103845707317480208132240829677581462787739,284310098757892373467222843970247205429054060471421316330985882534997469524042206263069,299847624552968470925472953782340098951841577967750794610622271633737046580015055374302,292198336610111863115342785948839064832627612268641045133142916555062210948771204704222,299728104428861336428439721306853720378876193335326403624127946036493686426475798849632,291959296361897594121276320997866307686696843003792263160154265360575490641692691654882,284429528543148120808179385639851652140448261937106904669169235879144015163988097509472,284310008419040986311146153164365273567482877304682513682674910281900655010448840984802,299847624552623854241498344249904976368324563720046924486606959673480028342694109648799,292198336609767246431368176416403942249110598020937175009127604594805192711450258978719,299728104428516719744465111774418597795359179087622533500112634076236668189154853124129,291959296361552977437301711465431185103179828756088393036138953400318472404371745929379,284429528542803504124204776107416529556931247689403034545153923918886996926667151783969,284310008418696369627171543631930150983965863056978643558659598321643636773127895259299]
+
+def PF (o : PermID) (p : Pt) : Pt := Fin.ofNat 24 ((invP[o.val]! >>> (5*p.val)) % 32)
+def PB (o : PermID) (p : Pt) : Pt := Fin.ofNat 24 ((fwdP[o.val]! >>> (5*p.val)) % 32)
+def EF (o : PermID) (e : Endpt) : Endpt := Fin.ofNat 36 ((invA[o.val]! >>> (6*e.val)) % 64)
+def EB (o : PermID) (e : Endpt) : Endpt := Fin.ofNat 36 ((fwdA[o.val]! >>> (6*e.val)) % 64)
+def AF (o : PermID) (a : Act) : Act := Fin.ofNat 48 ((invA[o.val]! >>> (6*a.val)) % 64)
+def AB (o : PermID) (a : Act) : Act := Fin.ofNat 48 ((fwdA[o.val]! >>> (6*a.val)) % 64)
+
+theorem fullP : ∀ o p, PB o (PF o p)=p ∧ PF o (PB o p)=p := by decide +kernel
+theorem fullE : ∀ o e, EB o (EF o e)=e ∧ EF o (EB o e)=e := by decide +kernel
+theorem fullA : ∀ o a, AB o (AF o a)=a ∧ AF o (AB o a)=a := by decide +kernel
+def pairs : Array Nat := #[230,32,328,130,361,163,428,98,526,160,559,129,494,296,556,358,525,327,626,164,724,97,757,64,692,362,754,295,723,262,758,560,691,493,658,460]
+def fstP (e : Endpt) : Pt := Fin.ofNat 24 (pairs[e.val]! % 32)
+def sndP (e : Endpt) : Pt := Fin.ofNat 24 (pairs[e.val]! / 32)
+theorem segmentPair : ∀ (e : Endpt) (p : Pt), (seg e).testBit p.val = true ↔ p=fstP e ∨ p=sndP e := by decide +kernel
+
+def permLine (o : PermID) (e : Endpt) : Prop :=
+  ((PF o (fstP e)=fstP (EF o e) ∧ PF o (sndP e)=sndP (EF o e)) ∨
+   (PF o (fstP e)=sndP (EF o e) ∧ PF o (sndP e)=fstP (EF o e))) ∧
+  EF o (flipEnd e) = flipEnd (EF o e) ∧ AF o (dr e) = dr (EF o e) ∧ AF o (pa e) = pa (EF o e)
+instance (o : PermID) (e : Endpt) : Decidable (permLine o e) := by unfold permLine; infer_instance
+theorem boardSmall : ∀ o e, permLine o e := by decide +kernel
+
+theorem boardRenames : ∀ (o : PermID) (e : Endpt),
+    (∀ p : Pt, (seg e).testBit p.val = (seg (EF o e)).testBit (PF o p).val) ∧
+    EF o (flipEnd e) = flipEnd (EF o e) ∧ AF o (dr e) = dr (EF o e) ∧ AF o (pa e) = pa (EF o e) := by
+  intro o e
+  have line := boardSmall o e
+  refine ⟨?_,line.2⟩
+  intro p
+  apply Bool.eq_iff_iff.mpr
+  rw [segmentPair,segmentPair]
+  have inj : Function.Injective (PF o) := fun a b h => by
+    simpa only [(fullP o a).1,(fullP o b).1] using congrArg (PB o) h
+  rcases line.1 with ⟨h,j⟩ | ⟨h,j⟩
+  · rw [←h,←j,inj.eq_iff,inj.eq_iff]
+  · rw [←h,←j,inj.eq_iff,inj.eq_iff,or_comm]
+
+def symmetry (o : PermID) : Renaming board where
+  pt := ⟨PF o,PB o,fun x => (fullP o x).1,fun x => (fullP o x).2⟩
+  ed := ⟨EF o,EB o,fun x => (fullE o x).1,fun x => (fullE o x).2⟩
+  op := ⟨AF o,AB o,fun x => (fullA o x).1,fun x => (fullA o x).2⟩
+  cell e p := by
+    change ((seg e).testBit p.val = true) ↔ ((seg (EF o e)).testBit (PF o p).val = true)
+    rw [(boardRenames o e).1 p]
+  mate e := (boardRenames o e).2.1
+  direct e := (boardRenames o e).2.2.1
+  port e := (boardRenames o e).2.2.2
+
+def levels : Array (Array Nat) := #[#[0],#[192],#[1472,212,12480,204,82112,225,12583104,2621632,195],#[4032,1512,13760,1484,165312,1490,50624,12584384,1312192,1475,12500,82132,164052,12583124,1310932,798912,12528,5255360,3158208,8663232,12495,49356,135372,5243084,3145932,8650956,2621644,41164,10567872,82117,8732864,4800704,82115,73953,8650977,4718817,12583107,2621635],#[16320,13800,165352,1530,50664,12584424,1312232,1515,13793,177600,13778,62912,800192,13808,5256640,10499520,3159488,8664512,12596672,2635200,13775,13780,165324,50636,136652,10487244,3147212,8652236,12584396,198092,2622924,42444,1312204,21964,10651072,165317,3311040,12748224,1476032,165315,50642,1495,3147218,12584402,1312210,21970,239058,8701376,12633536,2672064,1361344,50644,12625344,12604864,12584387,12584404,12780992,1312195,1406400,5255380,10498260,3158228,8663252,4731092,12595412,2633940,1323220,5325012,10567892,3227860,4800724,12665044,2703572,1392852,4882644,12746964,2785492,1474772,12624084,12603604,12779732,1331412,798975,3158256,8663280,5255375,3158223,8663247,5292236,5378252,10621132,3281100,4853964,2756812,1446092,5263564,3342540,3186892,8691916,8671436,2662604,10567875,8732869,8732867,8732897,4800707,4800737,8847585,8671457,12779715,2662595],#[16353,802752,16368,5259200,16335,177640,62952,5256680,10499560,3159528,8664552,12596712,2635240,10651112,165357,3311080,12748264,1476072,165355,50682,3147258,12584442,1312250,22010,239098,8701416,12633576,2672104,1361384,12625384,12604904,12584427,12584444,12781032,1406440,62945,5256673,10499553,3159521,8664545,12596705,2635233,964032,177648,5420480,3323328,177615,10499538,3159506,8664530,12596690,2635218,62960,62927,62932,800255,10499568,3159536,2635248,5256655,10499540,3159503,3159508,8664527,12596692,2635220,15218127,10651084,3311052,8816076,12748236,2786764,1476044,10536396,8701388,12633548,2672076,1361356,3282380,1447372,10528204,10507724,3343820,3188172,3167692,8693196,8672716,12625356,12604876,1508812,2643404,2663884,1353164,10651095,3311045,1476037,15369669,3311060,12748227,12748244,1476035,8701394,12633554,2672082,1312215,239063,3167698,3384786,12604882,12821970,1570258,4957650,12633556,2672084,1361364,12625347,12604867,12604884,12780995,12781012,1406415,6124992],#[802815,13909967,12645864,11961832,3311085,185837,15369709,3311100,1476075,1570298,8713697,15906240,8041935,10548720,16577999,2684372,1029631,15414735,15443415,1570271,16610767,6125055],#[1015807,16700909,16580559,16578047,8369663,15709695,16774623],#[16744447]]
+def witness : Array (Array Nat) := #[#[1912081269420810805661032032022088959929185813946496766939863361860509535281099870581702611669032220276779215711456510299171610107022379309298851880969153900707840],#[28892231334262818985423119209008891001699997359121198763479442383931698796867452815663924265892933590760152590361341966425335892053208459767867636108353279598264320],#[1253006452836070568998178645029997032716528658045062069536596074923262261571639739750010869816948211267315035601799652792023156901422259932422915332257056461099475774342919547216091320983111279371030127651246745878528,21714503675654053210120118984301473164142899327616251481563432024746286718480119641287026075681629339808071660142150745207219151515610266401440846393224114452904883891057954802808127262008383501044428990431166234753,336658971715566716435970836965905563256209790892433027837621365284514945299225453556358423752253965544824807668538679647333932799170123034282477266543906566602458999699310774441093302502306393897542021562761871362,840469122887912307582379037242032227754262213132314988360388992829533328359293758098828878766371428568535384130816049356022573949083106102197089010660999012248505524424200424681644072302910039495384785275948276257665,43429007351308106420240237968601817660051063209802954546252471198690211944622775464687192666685941950947197696392190409462239520085242632687110623201388125719466829454646719923591508473686318840913442750011259486466,1874853813483991042472095289862068041248268410743814370233929246990080229540411844479750399690480056405456789659271822524965155443008660406743650430823315383800652509572835133358872482069332856035115496169434025077634,582420021067930419434269041577612916560604300885496290049125736397763761329033218159155763693831987101010461583630677486884893605272159889799291096167799166741452835246843863351007623045587079035937014371668104187268,538991013716622314383305487668129013353529426894286932246839361008628200828551731475566434243375990016272788932685472670651629691884282999391630939464135140404488008759511880752393061352489529646514934677040866167938,1514965372720050223961868766346575034652944059015656437928041902029468094080151073497424241053270223113100815069408664827187480760615320899787614065392122345337625205110064486535557096859467936667971913930345054217],#[875648670317950338157395642746681809563215424167132191769242498264556315137994297873720794745112017143267496301912021104302118182924796575009552646816496703644053457472628548009918652629629333616823094485060717969408,875623267852381564841228079194048993595048488462561740747353114686461983994797259659283177996689846916744301998877034142656320498494012619005667616797875186864444404861067933356633122290858310666735477371503661776897,1274551969488813319244251571758078658211923025053599930961226044537819045477581721206771934273813134971107154499379537574789312363194596381148953914171958653825353387812426258438291939683395443090827124219575246913536,1264339417321486249219713000467762304897735782259324225362372202986852079434966095047395452195029138919151108538993742724492742112057835107629575828684220379450631565320218080455004206816166410636447367743412137241088,2981026848273708532513954334712076624319416260939337674140283038112927356159305507582601547728212691934608474170356973644551919038866278394765078931701495432299902556206624691601211698853670416511042699984317086663168,1264173723120815066640148611309854394336044153695557177368593635721103968347649987173313220445422213187016255108043001652067322484295642944377222495326756100633878185730110732383916933651594905696452787414788257491968,1253041975247985319578717436303018327544271090364079430264868551865167266238370731024306203073287701461542956812258316218743224893917922205164210380930020209538887136811730506606037377006116147815771744458620696861443,1533157347656543086721704229942850940444522096586975859537124889494394892708160353488426015955395919630229725786187377567995108119615366283813263867730201914406576053495001051107148891046217720964327062586469140606208,139097720632757728967151805032539100619453322676769963149622566936922509303433626897790386319092314510780513640861615091324693142661905684551410220847240059246376945191301119363223101935815004982546246649054658080512,1263947571470349111210956337883039688740525964849725069731787181774602622423629554865822432272472370214639985063676016049138992381824982268787053561070554396380197031716143434468983872868857856121976497737185834008583,21714503675654053210120118984300460682344092365318052478493875632541748892538425636600844441979187109937356133947942305967586882325383599772067300485151628447534470614853843883570330635986843005804427069861382389889,21882833161511836568338104402784467440926693050211793231775944531848399973513372661080867779508663537390618596708870783135579453315349691784181781374246766404073470543407666794919912037814046799529984384163712172162,86353026245042862765826519681753872380858120129715490133088616333194626621876531363017945881950062851738075609733139795063720208711270067498189608771099634464694421797251282578857934412293527510781188322236868231681,22387821619085186642991824516286367020547613550643265302958773078446677916732729923249311961981856670153302664323638092922049028591990256177927001655934668526274757597612436951340743073072194889934078745577367732357,87026344188471910346038845534101259898625457431265676961455720023927716588703637249255481185037211535747219494055668920555039848418724913779061464023012310896700713106601350685729822357714998907943473029027639099909,2019953830293400298615825021795433379537258745354460556476526159381916091582925868555609346815154099801574418522429718584059285684521114951907280868475149380899144352310710646721347879758350934577181246811061944332,2188283326967918006765222541059239847460183887585728770752127930614144837082523330670859206809752272348022902883509996413264915565533239922412423291779318791829927005334185990091119106908540934009235119760392912909,519128134385403876744267030601426378541075497202329736322498748566512977560378064339380028606716180098212116473859947906657621605641935331633604905767614013604339590681589745469582145392548807437431861321213374270476,2651189402260087891933270341106506309339850096055428893855102854035340683592656460923153328815857124242563799873179209597331431539909207899791292158664615538085603378540156360079162658944636893697438494744556293799302,540674308575200146596169164167261364201367611768233615526510808157267874561165876790796001243367936461218074251999736967149524918099895877261767988215689662756375039178680179337419516645814272453992617337883082853516,35853522940463735074257767613223592779168243378900992815489171824501933730157661934186615979431391410835697863850874997758791694317298427038183872612242639505162360123149918778255785367221161831796813523879849492500,323529271818659614495033238611507640348044060783472776516862149801336053218507429723895191149068598701149835508082925480710137800791754901607194439980256606162254973759803155462247802105497104665605331737861863311234,840469122887912307582386451208061516126739327334649764653586994562783090410356759845414646681510084197076705872630214240415788422073489128815759587607527705026316264466643239258395534185124719037023842383742582264705,970251156484263276768442649303447375836968234750643671109318029340183384526583197935133151509452704251664914646294544816218438111036174281194949029823191558521953889923613627430329363253233376524371567131339682125444,969914497512547710052006691833006718289105922015786298631018629341864027305376842226707795158128477106632072961648646805340639525877428052842883426907799135561377522726752753023082538840298447664043904208159936812674,969746168026689926693788715325585443689727477414205927717449152138102540683410315851825410512182619802993641637239264815464547325425090883449583959087345195732014902284794801713124758734115954130207831351606536541825,841142440831343440300305408730052178372182586040811789640765961247800970197542349481101238917066493931208169370596552843848958499422795232303657726252067807209907542136336725672008537066666432614552193208111132808069,970390385706564154329872324734059668793468455356312600975654014731306161052480229355147938482983069000790063033899905714321720263135239379769443232590515207619854516688751127588958834442212283218612760648760106292869,45617290667459290077074048408880203821229620388311563747003149400504135147242946865318384887934995877707820680163789609900543156016310714197292486892769956356745078880756257957743036415320506960425351364437051867407,620357515245507172467976603784228386151879802199025619801280793886288589032384885232158715422129479852840238677636509222175011215786240664423055115900566913565936500160123363350839745083376978356509883700744047705747,541179297032773496670823120422753871300520985252602896957229817316627426452305269961609323367267963843570956836446248195576340398466999628422452618581619724807916518269998995567355205052714280848392318102647143107727,519464793357119443460703002030955323514372287114304664664539058216960087452599010965733564106129300606554622345668073833463892638407447201770599195217467403913497050704986215263531515766780985824996803285381123705870,261920679994710905387185311159474528213331217231353125146155474756006901046755174469628962861813966100227435364528749185248354103259752908800861155535604079487809028513123979985089823809655087673497294887083557127700,262089009480568688745403297883282212141446143949253421912854225567917410499502048382181451543063647140716177318141676422192239380960953626430460269449789464606229590003217484667697756010599601274423707865257859515925,1877210426286000009233986380730231477376390470918835027702796269432323119852384756965505966974759331933067429755604406841745114232850223870998946195283980424530371199172461964277588428845509208605151497068686942546832,1877378755771857792592350364984604634763879302119975993478252196351415697766409670442517380806068149749473763925122540558674896371945995522983936693245447736545811071172949508801559234087958479170602885255140341328785,589489859473957320479369817987246352093286576767323471493097763630872847128820713527998968660483759572297241272700010791979409596906832643594976397780965542349200178543005904966961017264314070655981352276232202816942,542020944462062413007858957249347088683328365137419608763896965884907032250737992786990382144250324750506213434371085726118345549370322639909743304403061381777441051656282231046076544036096530975496418565244322450580],#[1151204040521844589457008951015088396187600881655183974652663777798015542470325382672862988081948762592068545304787042811928585850579954523525531691846196397246637228366943200508894201333958695584125653142238878892032,1151170247467099761080513782379450618379588112453623099580702977477100624818501163632540388026496343860754233450747397237388935873361691142690460492543495540658427491680145489122050076516718186706158775833775495151621,2991799627148112418695019917302052969354773035725574548363891585385516450671836376117778598964417766849898438366647936791212663346437185376786385230195381754240887334827920416289561176762604925673171335483319931961860,2345433074439029352580561816032905657284712053224661751026959390559369340815603408365637006776287938494242711258036013391580955106175893597884891354219230127041261014938869202866666752237146911398885033657793469186564,1129626045888496605613412768247238943817188863730216495505485570101197549588356828486262637329788384770017645124069550745670571796128009177245830977278415899611728559131616230164056029878839885719883817952775639892229,133318170270351354674261978415070826915220499786743774740017660759511713260160898913813739122316509195907133596643416446830580144806942827560991409867383979687876922349941501684333855968781567724025768307685422236677,135000103821708121714566173948164551065380100619491664805181201772848384256107886915412911144834352125247482782950561136051143431065622340581669904085570934515078604484967482035423156983642582283209411773543572570886,871080102860063203835840133271661579428531981285947632779919180886969624030050834226821589563163612184615941139311925172854839384867206883922794534888515907604372193052313347183904225426473911012292311036523836932114,1281789916489344086959936981092023832147472646993993564985012222064576499459518195882774423356598886274185706067583733439273137862183129815540443449364761089660805076912714006391124243158246136760619666283256077844480,1250373776529196365430601462698393561172119241047340479144158620949231338637057242064290966136164825370206367175951846350651374162295945025484748413937947801689809819355369827602967720821096318730708652700154088332548,264269885230844330856847175572841088717619469331778303755428911004815638661132977220282823976998462745954613942000893912536858483004220950300659120060304014215920748624609145653351111222430783828047448334806606905472,3090024375314851624043762192020239626673941545966375495643694499607610504847799435733577949808382641575276842464982081732284081828935997403480464044790418200335267005292198646319951335955867397739130030911846843325700,1280106678137856790163987788858582017367399721712266708474255055395758011983689772729036802088180320117187665037602060374152790213217835222403859025079500688743720628231321655652465783228001037999215569321738123313153,321836165282662450814464291116967043507519108741930208420673080603788336950083910112185288583252776525800004906201525681750088514895239190995398469111777125155980955675402970662012692583286372529415084543966856314882,1278928417969926382253746757034979683638011015191850593286129806430468043909723730299746386015821215981622579254681354921551007669766006148891179938696746818463635997514759287529247694475001934955009124998680837718019,2201683155900205957267270070857870615784144391832719251679739921395655735360576641997222365326201887442283646304207593091098502594263558693111225178270130904210530025579512285774487899726985413509133257179936929677443,1278928448791979947258720698876289486998576113953547632495213399739863476173569276850695839895694432676358094565575613707197258804484963246960079993069989856964166386760844776237991670026181346129819445338400431702025,1538652924203840668174172356011825807538803962352661396281736076199535570087973932706720598817257801003435779430157732337629043743170221331633785517953218347403160134506296379767047740986534469929401450567315249659914,2201741671560983016539050603761952303279393061213816276259469229819573691252971495334517645365906714489120925761744021231464177766052078640791651229897335095675940875669112191250862511208226220858670366464747746962690,2201742996909106516994546391811262776516674707197104954989946596129460796982203534459898942734167826968728702196862701048548266468334934101595435848591618091074128084460715193986910153974809694811276711552468121628164,11109710098970181918572287534923876379465150546286200420928485571559927035295657904990923730610007585023449772609078264761201526732009589220171638924130297139441420542481379035822949332092655449816703279182244872196,1281116896492385411523987523657530200754157129903272642535930687531298951562936982356322225715431363115684008456690419564993229256223634815516547317033168113881280510276801362270678140118528199274527452015034743095350,2991294633553535952164711989315193363612120629635101824614965036269316486771556364171464495104341168966105520743168010985950558986535379160026908183290129275191336971422842233716069709780631259652617925297617415635456,1260299653497129906036304305936242980563426052827545489510269294636746632616798384555800703346487927459935661855052725780765709687601656671932171380081893880326664372563508359081248654332285261971592115732532673817092,1282300252572485514398974051473887733576415643629180058781802699271390102636453555637239029345303733025207693369210830707556627307741737592911512175744782587902779079547137888526978886749200507559739501282792853406740,133319480207469199061550722194273919718584803059533762612509035614174112125629085151816346641466412978733163475688132069000161365620887408031821453301866585861314798522254452108932195443299822997769902110371636905220,1519325254349619531277594791577960168233190309486292118543503154839185970847590385931681354637258214083420854659969677565682901126487454694329490925149954951649533883603389966825174077448773347385092845046346511455890,1549935962106266134489990727695008345984238106357599658636928343553201981493559790724633190531843044883144611184871454327589972220096028063125210478660338702462462574936181628210043795437470478741017625288102761169939,133368122538404958027162966229726643370351519354464621355745361198020231417876442757736329048274920866072924392825041349850443918245839283880759481615811927006162064743090313988703485672937401514438632620398273964545,1282350133173196448371965005266977319024075975751130651628447399563259315134946064670683501245993927334075181096856124018709836966077550150230968615514931872122276782172043658058619465232000554059204583733310674512386,133368132812405496343265917142879021414601378291702429774261795144888195005565967394559372040011922731929279797429093570287709630253640969538045219133396262305586723879108778533969414832755840754006919062651156900355,1260244868976241221071993050900011616723369319574000743970037815488264977793672991033103396715563789595996461194418058770463168017162378054991759781719116302456100851448705679941654227356430679711536445454193131989508,192618961144457289802162373895562517104060894038405036108314134270081695825899687015028763494921024671424498474562058146229142043512798580005660517368479772633675794817201184612219431679497726479196341773149140691587,192618308744412000818301662373323606796724103515948620780263700624480162475409724639338043914465383580592111072114902809560198789717127252607779740704441174508760799744510669987401799597996667791586049774593322428932,16161772774783045892275056082254067303802778074550922417850103596370535751495454485815007092936055587598189832769094965157155724122123679367623153346141219465020529455432290844991898013868395531361618373762484175361,16161777911868433926338449904055811030070186461282373736606727341359097993356416112604618195600719945740573230035315597966593737207271986062068517966426708772828649060783996169770963880079605971383378345638676070914,2898208715546722472898211644583402131548687800882737430340387605822664650105986407518459340877785499031406282207571248509514439222929302815306199159669851126041350354785831615234030423854170445606704015494558600888335,2855176804068963200089568459060890663638131762179435052732173609147761142038772180984987605689040499756502879472622800637701646419904956444144254120833244561179838310385137518882479065867872370553265168166047693483268,1167559502377512427118169347608272113730728549167113495556491892381221562691202631540519430916349672302783695705662617987904423951813346497007274032200262784154304338691939028635577298992028658309868064116276951396098,2991628744569167896119602729459621495506678720893069633533757818515079648700084025257964075513321939815987637792640366277930505267455471227050650930364979758913458345444718871079845338074108190386725777944711478706194,1259907848742023330518082806656631999134530540676892061173093436481964080388431219460452553501452692705428240139456580643123507212418416519118139058104940345038128379891676040536281980251451887017315024194374228213779,146947439081108548830816002381381330033249344867673335654074701791550754051253878984415524346834118413710344837238407880068814613647314983328458192448413572762060723359069173463698367143011855897576878546012761456695,1519295675456184941176873841248203798226812126990878332021283407823357800211612157477579372053984131432733394912183968013382211582807440598358704506443095083631070674124458612124449936994343262130051000485732840800276,1540898968040496893370935697560861198479564246002676240812162498078055730785736581086632452203267355278158280188648327593453800677517975448963646336112652128229738180047041686630173811527732041026684547849222296251395,149529890176117063763881347930345733914360372127331870271674295191209561592793010276576999156947917968126114807216081176253229233809699741740094447412572363162345887217322976756674390919962945247899056166192495111169,149529895313125294385801888608765548996805708506004334526265215185328087729214134631288090421112507229051830199677982136610989953791603042133108162803359954234973116102870352361433481091438314784424216343405328083970,18685877690226256062358419082506083690371338579442316914911388896310588002312277564969886212232636639959135803908872750731027211020478598686977351791995972529040424022632007740149631539823647136130383604339343174660,1257383014331364705689925725232160672155773208949219913202573609412191012436013800240183140533298992872889741630666849110793878103957734471422387513463745282773508561411272624796376667153535718117915545205105441341465,1257442084789008627154222986381587622995337345265968472759251513101867149628472488018857748573832980726259144112818005917965898204510012279811640897660115657219554583427648498680442897124075930908281220663191103024388,1323571274682209356840713473292995688701285516190661662459082416344359844769857402718342843574189060557157675243132054744185185643560279172802359689479005518771286754796464449509843852385085521431948040230044650150931,1167533313909552716567252969024054823525629547436498768157897122648725469003856290192720161910295194345812249117929521198472900706400256999562609989890134537471743047307494238540754019664833485707706455559586182830872,1260775109294385410689769901956174929886129679086027413671735222981267924335465242677273731338145152654822304756393331786159697839597023618779997129417695703978514272507355449203602502698842882900448853201672944194450,1257447663409074032525083520426515237007963514547421255891467654377401667488141914783840366858506233134702945706561394691670112089235505414498182924529781269229528479830659927739684092964911180272972816518363391569152,147848614161835961769718474787332412783412241757112433557123272388261246327965257157121596616000591740985519426189820693011619244033407025393443431329401064788170923163249631791986630941187282340832047174178041376128,11109566271369107464550585418541429134907172417805569871572610070822283416913058154699879180816321310700982929440815848825612355533816392579111469462113541305410300577985952451578183763038304288568508252159883575327,1366625552693786963919985123508962065741816771218273253478868053101401259891182437016992941975291962409488398224377617230841709600552696221171964688682624638035267566146572086938529612492706243014844502254950181797920,2079538204570224191230943096849952145803978662534304819806157763839437178365344671635125125600471222126782060611760904153601135826282890752700055536149581531271915052068900353613289133370266707534294340774186494668036,149498487644803319804273511388125870744870517583162063213527071418682112685753040539887015927978781650908440770323834315824741251247706720590519425659713231154505494798147715309703039461370449770773709800511860904992,20429075241916648670827874316284222074836960194670898990946183985523832016353841312717595879522175531308105647883233744164923887163567673073423073269017836998340798813258098866921529973938802737425354602045498994436,22892810076658536717646016913685507892665996433771055887905852199964790619176870229373338778992677069998483579101002155071418558663680679586724758646234809656168266514627679776452603578424079794822894666664598274184,22724480590800753359428031495198314306138552167845999908823657961864220781380666329428272829888474213280937833734025326084180169029270099389788491851996935569928144752589702747887608740747433960224751463843776659591,23061139562516320075864002332164220540538482039117299487356176445404424074941846801773125483281376028705391439429063594765807162876529836584612796618701383395735630612720400591605979562105420873393204053799973322889,265455599197724355909763004947637309102459238369388579407140268799127569479934561839472108747780698256495764413212263336689827368939465967222516384587516047908749422005836669277757810033092251555915295658463505122857,23229469048374103434081988766792213596368058529830043087591304938944240736645159805376402277577448850087233793082216958606929644324506827861202556635874731054725130913610410068027908388005417547083798199193688572042,23397798534231886792321747238757390733452878655894052546468512529963408180933717122154895419742401435315513838757257037749714077252277990693432727602729358390227142839603876244779254494029580505005279852437209284747,27269376708960904031313637794237948120742811605975970619862392333774346237403557068605635869978264243650516839597328020239966659016132497096348806860098376085521706304904028796539441653614764115342649773419417796770,23566128020147476016770568615608158631968449100390353170088865956606309895437910730125609692870550156008079868489315957669745310083188239027641706587533191579776428374168690531352895375110960303415194390417312022668,23734457505947453508735944006097047627209500046764683771531165078322808181671571283033606530160537651979012429493955550773335386629612361480081379925235187783228134838727464944997014891760643740834965621047490740365,216808377784824965384765219006039174304955833038319589526177810537765010266656499645581963176744805088993393484372731635882276903862115615684722134235128954295195438616812839190680866087226403187277765133210015040776,24071116477663020225171914843062978758208367899540415562144842891002072801643855540810859618080701364677170558573591496008635151943461389897907895940975886570974805243195451458186079776143732429813457595750712049807,1014353481779002516621580131002669348831284282185254535343094644833544443755400564362644011911416536584554983392738093100796843499993788257296949605835940924568108574612920243596622550473704489787970801700906623604618,1703662726366625368524259372359609313849258472146063561720797991900738399217081665171927127217365362587584547564951634666380216991196446302399217769055465890211484496446945384868294159287845787469133412843209675548553,1704672703281772069359729401867200294431297606388487135079154376041495367969840272279262048297334620648508014540471277510041187126163593616343064856810654524117228432566768632602154223103392906015936583518550438193039,1768469578421880175679018477145301529288972897364382082191168731345437592765619677791333759653117202770547162152041714667199383494880114265387686514248765453530657558992674001268547669890326691378159054644563282569482,87699662131905129631570405410277027375273855347317057605082450308022200147184948485285274218137811178073827035863550058329845488599809936475963697560941067892938856940459046701565690684519500039767110697680123625993,88204650589478479706296070693015327263465481290812615975196278727383598661099889399332858661242131238262117231889045542660626372701009956712691155604204807341739411742270718283960561463752886455190848360818436801036,887938037899807213853384798404682410428941587713590095784769130352623971461411104358179466219434158969806428973417324616564618609322493302945837438039683338918330593889904439790065418582486785815166131448460282270875,88036321103668709231703402273514479621879503854281575536230351480198473630099483767890451744910091151847496988127724063728624138847426330460191362733773777207744214702817605111834906265513438580401391887405371097611,26664219647636846153270281575862097753344648785303591540556119776961256460170722754293104455214215992126432913112935351379403047360705893203291411191375375028676391176708015490343431640665808461055763091929496649886,2109609870641677444059963083898029463892056049239925954012925698828166571295760551410564050785494830532593153699808887517143451478850128691592030164535028941775745053038808669184109408225490076019150891560338946916509,27101047223103120673095652375755223562470995165147804395515523621634991948225592520803818665896287726891879832890612625686862517870831271518147603926954273008848644233073173549011299872363005359871678414733029605537,91739569792491930228802053073208564719186027130375366941404310487965036935449207776006914969942592907055747335258119603601343234176881074606419261150149941724342842435629564332629292806680996907560411100559930294817,547911818448444137873621184429366728120070184795640089139044184855371104608393090350964580642922006367284269509150082371309385711307781455887728545958208320525016078489413839293477968418320099929188272495738448740407,583934987900596078367049980406813785472700376325968372514165281109834888489359815760603548373398931160693619936439129856245356214662024032352864535101678594599503574656914230887350445507793321909018798254808127049101,547912476467084830999542537162063542450978077497683754198708925705897197540981787303229355032085442984056246408680021692933475106909808884829825132749829845165734194598028783348362586304543744714707051454927220739255,597399177491797796989422730974606605650675796757541624524030577746861218354674588614313331716200259895001728438649232001767762301001683758628639189345915049803680343222044777830483582209827665537342774450679638101047,269664496083514688377576747943394699378401903065225793968401406222184843749464293323927524751383259722927230061994217373120191166414460177141916194441247249309913538349292459034137573688017083075949482033074595249570,547896752564746315793189349007670969647710588405015416134479956339934632599349253392332133451147098009119358880213536672277320126354868531367090284745291551741106833920430493456829400764377147319124893133081258200247,453816293872583933755751920805475558354226134647715027941493841756280020364675156372392002725263584963035816911689276313206366559376255375262758446275223617555626810305070487464934102169517200762978161466697704016520,841815758774774574448130503865250323174138834208461384889102660638701007858795208293828663300059550685585725554974008206595849453644788285827612974467633654468160790508043698265953777798363676814519595617772820829065,841984088260632357806348453639619737627463494494476095525521061383315497386479347066579867607519681131307986883485587326777376771660648870869704409465140944405449419256162348951123475545621789219709133870678461485962,841647429288916791089912522902260388366750834083010414163844267710548787593600228897984342106978049002752630570203782128874009780531382870353351954214735555536234308006744490559791407051249526174614231933952779686792,841479099803059007731694542295406039950204836279740149655209848728833505649196242792386263195107458723133724619311696394169948790291826431041191455545176053339268131201569862316198061322121227573984089587227706856327,842152417746490140686714685263919026173440853927647718727447466523685875210452994209886040172150117404766582575250832865300886150194828630777267533379042608724127019368421203091299923003345233546843009669219253031819,842320747232374500007931602857605835389397859038986482531201129177837282803979337634268516812712150546889791707690047502430608227459184421184292583263701138289972066470307234204211138790089508143538122063180935959436,2100717601509016738294309188425303793493076294765858108085250916093895607120949579402227723394400249152921241729786040962311930831825913702911159740582981803822791544608661920589208511289038700100492405301797661283995,326054214359700654363016408389035717315285590962221555301061608157979059842225838496343404245103839427445752900362295865618530984310487345351543952431167462343140786603731228575861214923773141366043558112068753164177,972250326613523801364777957275099387038883144317314061210208541666107199666801768301538161959477635142884958701577869535513408048684453207891660110989238122486287358981789781656463628872674728059969212299164849870480,971407009707508318927733751610492473900728254355873648498975003004229109521997295605418347839585816051384390591276745909502687733473949378132212637319208462251733003505301699696337242190709337494077857174151195530891,2100717524453893207204515180313033161898184282796557313629853817095096141624075700173505913933273828121808547296215687782194374288369405789300441990537262953682403026760303648631720241709644280614325720109339786679948,845855666435361375045362046976608171887042116550226228361873190688641104549265980330280391400085045055627811337299463582021642080447707011567997999809895078094176152586743648778127871793367080988155892544507039781793,53192117531059541196883392240613078994486117104160917186445808927688930071569878494808542196266913931444943769270097218926511200313874602323594793520050799258408714053672998170753239124656171469391693825644706005308,548754123896373747790632464254479202654481479922315866593161148647851119774276404911087504706876118507656323494932916375094692989942651974075727295137277600650541050582099209621670674140506006775968906208919659941052,53528776502775107913319363077603964641462020677173057110547002777921471001964746228038818186829917888957852922620171174413762860885273741079270646173025337540221592584024953022367596251088833339901210055031482417470,53360447016917324555101377659095708113894879139000190914766019477331725344280665878405505877937078232582552497865861681803551957203204291195226017349397444180799643759278720569551953828108235028627744471636382908733,527039620220719694580512345705233402993092034888512881513435406488178874725114451811834192798921822018199657396145822000341085466313837456926205403314966294536661511360219131956869013841672743851661409442457781636155,527039620220719694580512344888181704091087939905924584244620469522225749221724012553579053974819647103212214236711743046442815958531573106794766930179126355991906119338238317221791217355337829728137567329902376356923,548922455188155875948214085355773309442083436019040120482128081034039918477259961208225918982148997212202366753821346138723067033999107421103442051562197718718711515545089074622032771534560347225403289904414252240061,2553012534433627541952464336166140281580186810339781654445056562818370720259784833802568728506247404465459624733087975744593129721641495849620960844028434960723065040869749883141135605830444131255552416292222323891261,341877185777158000540728384938877099486681042651199781582699579162061822693123708437734400372038678362212511063262978589086786969709179955958225048265602421198785385747007886634927341530108066872921454330961089497071,291210010533965209717114773975508312216621469121898386392106485762088535356394336215243291897649704935251052592777649172023649776399954456368279825338726265753925987688708838324691073051462279008754821214728806794946],#[433275469397640138384067255888074011788530121818055916016178641127291475607079750888633492371838120431997844660522198103540178339464009720807633077636283120943788959580966191694143490606405975185273123447057682530304,1831592478803878984268016418348775507305378889075277663530383032812699044090606670783625217110484077505075840236363121334488830909234331145556557637758238944636554934426034918515991944660537475556689504949416186871808,260069715333168869389213304144972813143992381418303921950149821558489920991719940180027671365985319919664983029222793702353012092870757214886652079215524080322472745133232265689461956748064903407308427451353503105024,1831537247799550411727481075537090601879499442295554272878149524370657786281020056623582435325937739582742734495912579989537012100989596788972063982063457196707293699725866142247216195473073138016722107983101589225473,21713848489337652627936931865814348693586167073742879672191409834667260489256533683850557325114796862491191139002893189631685314313722995477594016892967782709610523284687108939224218148439431385104010252375935680512,1120428021202752934068969058660712657676223063993716623118755101482406137881746420314863411203749607624863527500865682735323808919415020348148438642398746185973770515129461826912746812085336814275436702225448160467456,3083454259978733344581939183455715086778068378538485952811745704623629218286677794312495239498277468224680991790149553646005143141554523022417066441543935116921541485570482825060800363842026487111642407973005564516864,433280096597934364053094467175120459910742001467233817355662818958000178996592845056658993502338208475119278019865319328308625869364164558393993052047682974569446392491558881235623516230079930331728424841039506246158,2199164198226924192916749987741450263475083455293562608773720856170535133794139570779403028041097210842276002384863674478459820239296274462000183120589689031988619966385504816196662620855387606480137376559164601926913,433306356984033759454925836763826691985374465356728970924541184282122453878888854879609632256964543061846925394665874815108561092626973638280313881099641025049001124379790953900320275941609351405016834753346490801670,390215323678549483683607647608441744507721421470316973279440257824317405621549780296938931748066198022527843614268078842665812170111059712041658507363159830544925923166854315649120434986653091590121343440762794614278,2199157627993422960970001149320049907793592721398476449352245189373583031960202450485273539789521481760755963234227975346688506316816877148432279347188015398167395691274485351579388810581467401274452458742266076790786,2199218773802392053690152305512792596334600230628061618492133564826285408189064137740941936404150452943344930548235748278108083442676347288631224547438790552534392398476673115998083976510395560917274128281993017241217,1012576241315069003584488798151859294909900503766584340451286444871706354626599794093516235577434368560496396558707040785280839462720526857596845179442682381978548357242437150406281660204852402468352182021284430336,1012576241355499108052857189176979776403709637595173088491859026337062260602412850328561752336971797917522902370724518182407122668501309503712132701741919013883283687374321813542326728324915371417271958070638936576,454815025876782999247696090641885088873217839500208469860679251051308189151165571398157062390485835158065110280469185390397357630538828198967100901009429400368062316414338014028226234197684106800864248212739217359361,1013238915454014916052000204817160827862026068255443518131059104126099009623058761815911175025602906060702958486448399600935498553411746857338095316988917120839830953394283424383299450433626828407277857078759785089,1035197380709942258326855774554473220911730866457486991802602577229217668271441377722059081645876003069805743577762325140844525410774083956370516641762800185882540133291597121848099537352925116377112020521838780350977,454826270444486088220883319860338389988319203077518613038853896262324230334962129807193786447608220446117141235975940199277753014511354742200744319789131585745533658068578276197026309609424350540816890832301859013120,1252034715810157077187857379818987174311228087291603470731030880130756348827857361626191087314900349725997093235247364925497229049375657794066695905465189040438032884124329497425417602782418558745631204380306564977152,1510588804761393599167087887166748382954310436008486796554072145202437773479974433290998663099742624298413874066567517315127767405996255943143942864567090724971106133024950001355742569186962320804603334399625349042688,2328434011784525010767971546594377511410132095596840621952735071914321620543810615073301191244937003799953268003838727950553524546310680725995137336969876079780654160013250463235180515818607772487767794187767902569089,1251999799545147714347988818690995964007136866409224220476182667986371171645404720565467238937766049989751324808387921133085877246807495440213006278415124948626047824021758713328148534761518161771704333804456911503873,3061866005105204722127491873537959192404884507810210473342138142615051288540461273573745162885162352124366793418927924168775156631090996065670572927548042081392008416846531213319422462854836117265367086421625495042307,2459631762387839613452582248245621199679667635308981467137011914161443996740755736386749001614188765108759738318304234693143609261757179487898513532591171896513909365781463780219544361290702137946442431819155740558086,1252358881577891312631056583596178414806042290103462924706420828367820626151436479136130750331758230170758088585992867845747256307340285523803337752950865841301871551669621426829369247282765239834119632082463724409744,2113877013861521973748790317718008920458419097610053033772333784790874733362292576969933735523898887505750732600895212545156851827054666606919089137291304296508525335914318542811951692371581821497626552928081633815937,454845287992236526081346973739254942587917510801973467859703405503030792194910317467947844031277046191026576488782807753063096959463581596630369994990173888317592947472764204214722397714636071295219911897959063034116,1035226338025338274092943578529589335029132062814386602028849027293869595625085827054987875566681345115247153322283747891222338484980787067524790776798808378052747344113234418452005772673186235542614709883752916916230,411785865867042591118725640075560247800723217465047018079669202719859951639321091805072050096491749323381307979372948368830563331071165889038378946881982550666248952798097606353524114262651563149374499807693013188610,130788029330177723946759438312703387032678463546348506518588746442005518379145798051639540253933937366662546511043427934079467158953755228944831156533108853587842813853778883506283948910684892506246626761361974558722,1532109993869487111782860979893404215662709984572597931128578143722031299065020351332557921802005931790634487508431457637738564064926466806633227861511922361582762935278683286680745432991979079165326627852296139509902,390201525253974591086357076014592241339378234733516789123410287155143903729276865691221224911680448072482023710500069904307819302983114665479819513960466779695456793827389289816542447921061046241516155906563936555912,1682966680806706772254230874063676611835043146046719614770695058375300321881766318741547586829460803592647274716865235469122393237256434599553641423539009633329394840074064606178416893168964825127433846455278122970497,391225269771646771396997917666792831768047395474698422395363012277947912022099503000451965427748876044551169034872209298582601125879652441791850047163348007058469548830455734957343613477976149670420644629407515221510,3083421970412674738077395840063663917607714175340547016808207754014620218686340261823565331212762631828018667969436719630258043655319405506309724114038459956790563479293574462608853543125020927628674591899235016551168,433280096597934364053094467175120459910742001467233817355675261403759166080340176990182377645295626829327504031044945198268095907440844751040043274853916035574371871043913269941717360052584483312193667388912165128718,131972870005652785016803945565962433506229819014914239650008155545674439043976770373217749648606032729061276717888512901119850257312031496315603039935995650108114592065900955079790279796738816267094452105706316760321,433316235450828214929579262893219155937221246375764952050413204633858129870589468262250100587508523770389702376548349434307752325103074043258842312578805388149180599807264960328613673230001241129491247582642962736521,1532096817443398837337026462197119195829735064188035131293654863586997503358548118351733784740795592767500320224738628366101820007953262421754769719236626219726933827573477417146775413638753765055455296197656276567689,1532134980277544126500107271167376637799827069376322096006242577641213000225882061332287216056713535222149115589722774453481065827738117123052385870947161938724917815933710706002905681089017624172604146516748942123918,433323422125391778141327209149592054874128580127363329648932450172744157268757758321967593151853312794710566918006468793461413606173427897028284642145558858091238392175077899796393385316328287857141028667793412139776,2865800948747065918785422060781698810029389727818167764037511413161635766854061358972993519367277370626764906781282271854496484973379073795126730887313291116611800064819801232348330312239786472261022288913383289207809,1271414963485434673675450591934804768768285517825325267570961288658188789785425434504089492416908652480923832537109691645597195348778289729002116112502231015369975969566362859498186738029835616174811187555029664341377,2908901845108354213365006016803890056095572339107603688980247643894195866229010524397825093263839667349216876545837739210584352190711499970126866615972987945145736082326050996006796061749829027962884312635312913662849,2908891980607601898613274021653588768324693319204845526104414480036983859934545377637748629210085727093147771972572322383171374942452693125057640746485368610745156813884973522160474490112529589605103213401195654682624,282111671478070161594672343100921078504997982194170385066500460117476423856225790080525925828809293134196736907329377592915601306074726561234797550568555009941797854341872010445031049660526930175102499662862374444289,2069442699135570249471694968986715863642535226012349209165591885988736354050212890855503319192904221800617874969838512128282157503713907958601274555225270252103448578782405794104624095627705066494994916540999352659974,1273248818376627539106584157217149117627997996426172183798056986150151094057308417573866713371681328667469668841146253133856131620217389940823017707755536363041523242285883257145751476854283973967495235560998206480649,1532131666907232289638956715292954180561736020096303883790697457511696216018247223507913324620500068429501446133784069569676587644916708424976912677532107706394670084935455762777225667753574097175078390902787601277193,2069442699135534756487971208459359509369232482540259751291852145992160690410097325628398345583778293869818845693286769747861044717490361393950230283633663119502997775113182175543873954051904489282181190978617551040518,2069440700839331819840103380332185555602751215853945306549144199223506976659456299277502234218299628536137951011256710951250029132264972290043140567220645967763268063165625369187960582245036139356624158936108150238849,3083369441912813842039653252252335622321881868018550722932191693407335178852044844503542657942997328520016753094249822103718638446089630077007404552938682995057028218930861122540316835986114717205853739235806160395649,2356613963824397697234543499864622823632570870525063940875755577488484691029464807904921492727372118349886230580745729545523891782788165446516075006017808629399770686397108249076540424225237043766798187842351701249,3083365500282113305295728727152859489070522783145899548109694173838150215871133651322981857864245112155249583326590182827825548411319119355000702329462739605602732679421781976330302806682027048310283938916570073864448,132005154916240120659873333864578109384459186513634072530719268430502686157457703813071615724711750842452160287512360162876232524905454606181663894715636327162843111334900368503735450377426067254933535760562471829504,2070726206950462328109200878400749953914918402311345978812468430781204967896153472265820665486264385367091017926868377197229487087133307981229298561947837045136620229795301816805720700670712511920733962240761241534477,1510621616159348007042945369261870079890778823140289697039686071202973253860266638372394036579816482254028010772980915461342279693801819715626901111505723642095421747056953150825970733286975115031361194927498320985089,1510603863200680280777773599429925826551506341447948269738009787350036194893308934270741707851879957087196561203733187503306780152623156132594556826261971632631646986262240839099836721385724671496927653132345576730241,2356546020944824590921552658005089398246045298823937589088380707142092813869811118580701883305355567580668945729146439753831379193439943233502230206331666484553930612999337529629442765560175161213039862051709681665,1704121029693355348995628607328006579767411224760386179645944097621891666068141415880157736924346382756329515359308824584026773727438857247375359924864388545327467107771504962831712833468221166493923373913973379761164,2356602528035361432047500120623057202616098560794961947128628353131302707307498604166962008517091050822719432121931323714592628557704377235445100748253434251263710191564208929011799468764973390554673985463586783244,1273210696638512591282446716122466439712700354137112721517121573498553730492475060050482183812215964009095287556257415114611263051144635581628147990808289647168460827718638516036720836550749913225525145453365027079180,2356546020945446519466850953431655043316535922502051841979143781518415337444699321318164751283481741703839850421161844437995312619475741530922706862031495209257108148828812240037766822252885171647207768050947358721,1704183480302415019683587469261889520427162633351885096394396137622996525808211947092246367835544951598269745957669362272757779461202449951126270665099583413176774933485600398500811993196535763844237021319374496543625,1273244231028273320458702050287296385658274886709133158915585671244296791045313830286080767742566817687552165646615414202097938953772030749275923455671023209266875085140060633520543736839686014710218172637631436234124,21713912937734886699763713176942479820448654152990062983608783070560357485289232267903817087537786790054710230387312476133323453955404651344294139307523229520697286379397811493941984522176352189519059569131193925761,1012576241327957276674548916710501623245715289746681144097438261548837582470857741006018304835166199683558550815656329169540022948062879149468060643088183440169058563397014506988089431563190215325069058483079348736,2019912734244089054425003769228937132261674139667610064743399248186699773758910462009376182270041783794029797947168447220927718592954721632551287295260455768347884079652375059758266312140740189745170979707102199812,411722692908139218718341723123292374296738013594689012927823278541955906949398590182269336799961006531238451336148687399453767104665501995626238499431153158543994535861096167085039636531703063912283792852713061417220,1065179205644372877805546522952703585229237010561808145191560106016277941175187323527612941865585453589410039875243892641555464326486405156414359286576170891621308594592723858605330332712545577461679843676566989312,1070444639101025648805000206547255957213382450126928750304331299123279189694096818266614946653063127221044640606468822150374134739915006864821462172014938918902426980861904259019490176566942550941027379035188014593,175781923500132249110537793276931522742301521970892529039102206233225548288195491941878344962572584090120736506412342633351902581777599401509305525536716629576732043330346386669436449383688196299679367705028043679491,2363121391499635318719182660360080657422877178500800019506320843543683859381506040908461136238774700050932875906463800909925685202777458399195531259102069351101882064228364348234544843054703652906887022037977990401,2411779133402514703048798751592457173662500494458678105517579362377932658598147954192907113441022888724944564404005234808623442585661799116977490527095849096657900403503438142955780881934915050751156381303613893121,2411773996440756495659239932970016523638273472074667695552516166199222310435578849364675543480065375490862423328867757583643179061649296732158396394296351858276734798790513347574338754540363372050184165932644379136,2411779133446604652844714833524987827275116051266403363426014554340993015227092416790107858033486748279488837008175137397755932876657624406833029018759426896846541883433927363952192614270914402671285153848185104897,1831593135618493631210888791421596250399802924452152528150387357170064245448544992973655426363714445967860689320026483826336510016238706989265956367901910315741710803545680544053495825932376573094804576075845017578113,2090147225896095958992724941302816776108499182647501639418791690341447615234242574683855043471842126124356392259647446988347962384425572285875082953518887301543882425727990267716352660417428751996508353504535351013505,2090147225896041521108748408197720768903153613274201020745933175595694742983225609163168764415054823563764356944095904902090182756391531123642934256198091207259328406333545118848948313863376409688703132487571764359297,282166845436491708215465622907283204371154719366185998903002334689142957870470989618449082823950318172723981843851101152794576325465114770918442811228808437700158661070744929231654540913399728857672970303261450306817,130794599563704722871515191640761302155499973834541048697366908897422468806546949906668320464386679697500444093151480306103190748824930570293802186133790174695957211889597695479408408646725224416682061780060018771201,2090147225896095958992724941302824689946240797730309068012631571395453738836484731182811886026887699605027789248308833996186159223345813018856768309868131575652764385148987675422015894093509671958143240774797723218049,2019953830309934029789293552520133671618871293026171439802374132045297350152203850886895028089260479380024965609842919742937212283821597161646101774592466910354228903980716960410508766147346228933562783374592311308,130792010511536884322185194666883624857156216421143260508053892991787194413655334645445888804690845714627424185126174449874350270344202189473068398730504425087592086911503026430785292273978923712995299893391760229129,2411779133402514703048798751592457173662500494458678105517579362377932658598147954192907113441022888724945746917557272939556722909581326043193971594860764060729500309867186978128443985608102155622645978742282201601,130843257305607602255844807731993678671739598100829839883752549177583182434140256815486495119445454863343587685755862371509481841228693369267830668526500681598801144302824688910975869375695112559057237468229946255873,282120219720480807559889320059206408331868585517044385572624638862822618716684143177202548072217362927714800585959264513025664020033666691014757845339548344626527000075532581809666351062016276126958494212053226891776,130843252168645844048455248913371238021715369630541557925848011560482928475683696992783666978104557202863151824479053401203854014733389914492401585900325757422115656289043078771737125337663917558649965244776452663808,2090147225896041521108748408197756301204969941216904762494469963008630862560312301150343427228768964623788485676553525593550316806182020962145986824855860056937987157365506554158152831734428714588485659613623082233985,130843257305645568601502402135880024512350460763067019711087738248171829690380179023907774145244878209820759439717786369135692736796693846339905994533044299975914570335464564597986998058299779666340696427050280888833,2075130435770156515561615562169596237016060849508403359763150671984830916122208773804580226847073902072686330456092554052729861946371238527905101236103631733919583458939959480555735129460366427504775162462814120449,1831537313453608742368209897049470021534364901461244691498605458482614032751769394851643809274681949388512688610742929368917551675559867466262356289297275982135277025646498095592023876325004552327750145223678109362817,3032468427506027676670832672081800797302071183811407318438000101467022969646559674687137802258753727526885808479394791257087856655668770886978116594739789644417848128596440630112028190352685709705507935013631427072,1164972838935826003460565834453779161685068358035629740147245723492969843706366421649323605305398203248503770770699248286488989092017030134525739654745047411647127613452425517077361154158645709596778914874080733986820,1165024121688920689413365194932329582254129848661779199119271037696276188994868835361995731507005253163054923429769290530299554373014246071709335464603136721252467488879491566675999079204879484055611169502221975365379,2671893929020519393650572577626703873609227924533136166874033053079612300553407388834774797550975361300071274731664689233866889881459496211386313944663967494515698415776615763897825003289789103256699332134032319593985,175225683111453623766617905023897934019155697815512371506354111183548183751834153618145111027785027280141258366882700681816512607782462394774971614980467155389962163264852632846745252868536302608515813165971813105671,282120218297640645770771431663853059361598037022369043338661438249407975395887353773448363932460110239533052847012311454793722002724203818053402794625463298282381676954480206939337414898450548187741200118713715918476,45170108963520437484610150606725930266175913572164356970300641201595566196893965546710646552094313921504384334668814398303192204026406964374142065515237840367427772158019889688731383742287774169708491658087671213313,1166151129925737799176066074402532866331607073528027667949566578765979160355662982180869229532113545906215634846525150893027938452483849603209168356219135964116604508240775055739117388657915259003726872453621819375624,1251703301723885401220925062656849291585553343912555438219916985791120657295702715732875138703214572787050225261341252393859545127327698221776943520799781301218440464730012928515942567201400697571517324862261953962249,1251719699054122053407617307759308849627551821977092908793075087462100039709184755730145760599362185181845624447022563493425811762906399756232818580444429292009374928433547452210053685281016269156714784445509230964097,1747210747924731370402592184565100643344863053213266639490302426632766276696560472921088635634780481037445777096486451848656265913873744931589047472379806033035790550298714663205885093773723015677202442341251421700876,132485800277886989338736137350938341689339772748363957968028443684823247354812633234136146782985470556415731269184902514335614168287000520883690801734467871397575610964475881047219132818822222687089660849175275178766,3029930745440090879500266294254600166585904912216477948549276846501604693349976404626886401736084230317111653131510466599011850132740428130610847610674359992949385264686706674727971204812853598347065012231636254736,132514706223241066832274127256232894702089105834553507912307236707397852110774804244427683514063611388808205726214622428589982237587768227223866564098470402361224238482851635986993296852741611524344240279737390637321,175229665936229458505971882207417000972639632058193114268848150314880156070030085861555724120180991174754642722567291452300172989523525438487473103547628566926360683911225991107353404450394660479150873148589001354241,132534416923786470157664958736723842918974195394256960291077794968036294238400221011600502883673253779505571925126220528616325000209960552023686765359003129142095048234827798667079812513209307710585773020913523437574,132134708076224886877857275004567556848454685444628421391955795435190555415365644330423813810293978542181281889619564154579505107524233957843025227436737989218286532905725254834255895753216160445241601660558357605377,132643604074065674028172577211098890580677905500810125126692392266204122546583253991418687013848514443600976694657117158373139997734040706186410789514076672222192097590407674867801338425840003320839989143293714181120,132139961432335323294495363756588653610228730540396874537267280437036347338894592753381532689088483797856239976525917581733183756308319318958318311822140107078328722205782772250442242674038777671476653600280045716241,45170108963547381342818765990129143443414743710662087226514149738125794768353767940673670824681804576312327524888148234155824390218761516893038348730841504359618131662213639437490239160910842952020246789169122585857,325212566677229511032218318399243658573923262410538337752203150706690166550685314480126424152902555111141144896789397292748995320547972247933140584529545786091224801802610043939919710780271858894864653369668438263692,1252001838957486020113223592399155338277818150955452628722229147834098563118657082689629526753404205978786266970154586062186701757479656316392509036648874383160821458751285915709874345474768605474592141194405184209934,282120220865627907363650560239233975275081024149248688720090049791454898710481673425816274532775453920660847482757986102334031511143365764823064303008759372128424249159148670846455378170074318261366808148199870875273,2449299841557555916670094828932091914436844093711592726768151302187380276789470221481697922591010995092162440142063413523389316965821324972291555639301896683573303622733226674638427253773068211130341605319205242505,45448961181605180881339055997224961927389373000188284496481996108956716534493741178511433640029147600756307449815552213839329117867941998308719276559653989801036673407463976135373884467077819925355886067792283631886,2862906059672895057523084432843228228793229546407448603826079007138927246212860671183582060291004982741409825817481266045407436676126193337593911941580511897033293252074915757800523233126048270625526310157184106767,45170108963508802636747339418438179121503705798760364856353293743149285498542658099715485362135627783737984971167014310669556232649523413334792141899558527364512514761151707852264040562359541280284861884762348399873,3436257580008984463562576418326972929418556323795200861064581565484960790348478978722159641873349384457615016011848716540767115490412930803770713121937239757075102046638067807601294706732690986046807394654068190977,3366589717155667164359708369659055632562097909041620672547487344206223825952535456864828451055804404304991075254336172027531967050851582550798685981605784308842966493987120620841758237081922972220657934784518553620],#[150822563658579102440655609067844512669379055506835487096755304316517793362506920930784601115403041644359854632042676354536167895548447169405750225484819036649847585250186059128702541016599958452588598729801751068672,340593799946163736934740305874337891699710137298021248125955628633085560048677535571800166647943326027837164833593569545815863288354271451813872045592513215853299226900308168142276282199236215744793039633414882048,543110195688297898791397350131536341480450528910933791481184909404355521503093521183898348150067314086108222641454469342038423831136378410304062752642834188098328332170236273491690218144056342398446738988029025536,1508192741062488527000977413667392480986310232911925190594176782175690362106944667924740368169455593824818080520674398448320717702912929903449014422844952120318833406767234952619101490400649796138801552631270809273600,174899719407401831714978422896091302260634602496784390506333233934829044684159717236633938421227283202986560861731715918001915083817113091234541485360338974104391218206816143801892248474097145104244337920696124672,170954497070974719202281810633419720466190549234603687664216768227755288189720115769656963799565448662312303161920844810770829029046801932826410647554854795888276800808679427189072403940759924991067694510781760000,168329485863911933451313638368849782118018349908649357356909622746672997019927734426644232355860445066489297572790669748209385778297846997211808550637479859090749661664058136413325782611880517782922506008279515137,452967398124691392849137711526924264828423673508857365280289090262148654519615190498587124847458297680210905717270347105010302164444153310571743427677519866341566200046831337730091172226604943919773990837244726871296,1249983847444312523502514572908334171803565220389761434987431583857015259545182531028179689378921037924316642221746493566109652291591627550285700232128483296364716014945530317499920410966462710841231660652775266583808,1250047659420750785307222201202180114919115853379741693559464507277170623583619410891984149701127722936085367605321344156594836758831488760410912822133853979053025408207661244634726612527974427859074060025671349970432,2262348288584197989739370013148114637350232793141687273081449535465915463860194273978778080676477958481392888435943727273223500152306272991148281767829845536488817585439403747942239476482628946460520685844762181243648,1249678102968050774571214479053830272770601773674037399256123126970788300308924625422467514553492183027865196029991778789753790982208410252452947550430823246169859957937819438151101405196612242865831945919777539628032,2435316699703292714512349626985270784513286433701689895526962606846353750447153877600304934547267897819521259121770944334353665692148508259094236001289920089233284596033174488261832243455438413118693975315814373523460,2994918212381681506891472408193248226202111054206660684726629037967214966087466141154945592581271975046351877191287331606343547939532265858575679636836933163677218194044772377122533648141005553070361581956006263390720,336658971715585852698920914243462477496913083241597931401675379035441770603731730371396670386792334102974184194797876145407665008154499251592451059699171192665191049524287468633484818877932213640063830491284963330,504988457577024237136949262276569816210992789931578576790439000614991146083064203932079787834058060284376226907387194370796590620891499091791354212709906902272936573130630970622030041651565457429946956383441223683,841642292438039098865229558942028196390469549771868147870463346250563837022311197464271505110460531660652949114039520483104691391071580121650712847722025330326429603854002834085799689484602059311940980012014895232,173042711461801294042113660099427413540589887610966596330880277589138536154984231747412676192221994706901672042834879954408817837830335865199003003002780138422062517754187474092933945656036360531364065730906185401348,841647429288916791089927092414763908140524477230921536640967559612540956858267831609621218196699730604912033064924856403825628036484872637850329720616568537031284595502892542246111088352385829483625505500883484677,1009977075249527781598294660649493264194178764637747171725731218329198985783790713659784662189722586173975971581321205023707679764881117099833773541266013320800130340208862890667263181019959076440063223781281244672,1508568852257454455042050875443456834381438416817421341773075578189067841323163240972539462453963990916161697120632262358326533894604822235130571113170102793558115445242380026732512145602779605742925445794419018113794,1508560961812804872754668853004287311489750930006702651824287057859890136279905788407565717868420402030993367578434402771227637280317516470334699936782490367449931637215850884993311831172807844821774808122674072591618],#[3674162486414837290927534215032108407666892330636399412736071118301514979714592921996970095895201299305790591120658980247792886050129032962029442409137276828198875400245330414597318233158392354988621824,86184696759189978440425808204570487163643660455243595796812755494042268748221466262478017443970877219694141545596387654201896182570821526341099691994738312628143653321962935020445770025017407793302538619991468540416,43092348379592539741207155314902668499215178057754101851276651639450182373879553470186055347641092476090915488790611988807799269070748151797337126885490373930536315663996164405922563201538514876835420578625815052544,43092348379598663307948291860454124653819906748235891723686358205112090068958277162022970462924545325586462245829515856577714117318704471562961664244828319312144506476268401691724544866831208672042663392718924808448,21546174189800556505613256128913866726378325330404266703463163316692454180985667021259024809854172436733046213978498960723388275261140875691077359920740726571395570158722984524646562699333215258871847463681213333632,21546174189796269964028674184501025741722859998801916469831599610338784770443572351104373434534713756578630088449211259302067452218299358003053520117066091555647658053900828346383926344492627590445346700058385449088,258554090277555238222825602789835656440439873810861278049846322096654182757864494956763831098400039264299503848280828035783660040017034739474510759251382594893855384343489104783496895139743895671262329450853239358976]]
+
+def pointer (d i a : Nat) : Nat := ((witness[d]!)[i]! >>> (15*a)) % 32768
+
+
+def cap (d i : Nat) : Set Pt := asPoints ((levels[d]!)[i]!)
+def size (d : Nat) := levels[d]!.size
+
+def one (d i : Nat) (a : Act) : Prop :=
+  let w := pointer d i a.val
+  let m := move ((levels[d]!)[i]!) a.val
+  let j := w%128
+  let o := Fin.ofNat 144 (w/128)
+  j < size (d+1) ∧ ∀ p : Pt, m.testBit p.val = true →
+    ((levels[d+1]!)[j]!).testBit (PF o p).val = true
+
+instance (d i : Nat) (a : Act) : Decidable (one d i a) := by unfold one; infer_instance
+def check (d : Nat) : Bool :=
+  (List.range (size d)).all (fun i => (List.range 48).all
+    (fun a => decide (one d i (Fin.ofNat 48 a))))
+
+open PCX150.Bands
+def paths24 : Array Nat := #[944494360608982600091689407077458150,899228972693802420046595671804903522,727548310346908890193318370647117825,897925987729709445193067719042433154,944538608299847986500403370965142529]
+def codes24 : Array Nat := #[0,5,4,37,44,300,3,43,35,299,355,2403,2,42,34,298,354,2402,19,339,275,2387,2835,19219,26,346,282,2394,2842,19226,154,2714,2202,19098,22682,153754,1,41,33,297,353,2401,25,345,281,2393,2841,19225,10,330,266,2378,2826,19210,83,2643,2131,19027,22611,153683,202,2762,2250,19146,22730,153802,666,21146,17050,152218,180890,1229466,17,337,273,2385,2833,19217,153,2713,2201,19097,22681,153753,81,2641,2129,19025,22609,153681,665,21145,17049,152217,180889,1229465,1226,21706,17610,152778,181450,1230026,5322,169162,136394,1217738,1447114,9835722,209,2769,2257,19153,22737,153809,1233,21713,17617,152785,181457,1230033,1617,22097,18001,153169,181841,1230417,5329,169169,136401,1217745,1447121,9835729,9809,173649,140881,1222225,1451601,9840209,42577,1353297,1091153,9741905,11576913,78685777]
+abbrev GenID := Fin 5
+def fs (g : GenID) (p : Pt) : Pt := Fin.ofNat 24 ((paths24[g.val]! >>> (5*p.val)) % 32)
+def pieces (g : GenID) : List Part :=
+  match g.val with
+  | 0 => [⟨63,6,true⟩,⟨4032,6,false⟩,⟨798720,2,true⟩,⟨3194880,2,false⟩,⟨4259840,1,true⟩,⟨8519680,1,false⟩]
+  | 1 => [⟨3145731,2,true⟩,⟨12582924,2,false⟩,⟨262160,1,true⟩,⟨524320,1,false⟩,⟨4032,6,true⟩,⟨258048,6,false⟩]
+  | 2 => [⟨65,1,true⟩,⟨130,1,false⟩,⟨780,2,true⟩,⟨3120,2,false⟩,⟨258048,6,true⟩,⟨16515072,6,false⟩]
+  | 3 => [⟨2396745,2,true⟩,⟨532610,3,true⟩,⟨9586980,2,false⟩,⟨4260880,3,false⟩]
+  | 4 => [⟨5592405,1,true⟩,⟨11184810,1,false⟩]
+  | _ => []
+theorem atomic24 : ∀ g p, routes (pieces g) p.val (fs g p).val := by decide +kernel
+
+def rev24 (w : Nat) : Nat → Pt → Pt
+  | 0,p => p
+  | d+1,p =>
+    let z := (w >>> (3*d))%8
+    if z=0 then rev24 w d p else rev24 w d (fs (Fin.ofNat 5 (z-1)) p)
+
+def go24 (w : Nat) : Nat → Nat → Nat
+  | 0,s => s
+  | d+1,s =>
+    let z := (w >>> (3*d))%8
+    let m := go24 w d s
+    if z=0 then m else roll (pieces (Fin.ofNat 5 (z-1))) m
+
+theorem eval24 (w d s : Nat) (p : Pt) :
+    (go24 w d s).testBit p.val = s.testBit (rev24 w d p).val := by
+  induction d generalizing p with
+  | zero => rfl
+  | succ d ih =>
+    simp only [go24,rev24]
+    split
+    · exact ih p
+    · rw [rollCorrect (atomic24 _ p)]
+      exact ih _
+theorem finals24 : ∀ o p, rev24 codes24[o.val]! 9 p = PF o p := by decide +kernel
+
+def verify24 (d i a : Nat) : Bool :=
+  let w := pointer d i a
+  let j := w%128
+  let o := Fin.ofNat 144 (w/128)
+  let x := move ((levels[d]!)[i]!) a
+  let y := go24 codes24[o.val]! 9 (levels[d+1]!)[j]!
+  j < size (d+1) && x &&& y == x
+
+def quickCheck (d : Nat) : Bool :=
+  (List.range (size d)).all (fun i => (List.range 48).all (fun a => verify24 d i a))
+theorem depth0 : quickCheck 0 = true := by decide +kernel
+theorem depth1 : quickCheck 1 = true := by decide +kernel
+theorem depth2 : quickCheck 2 = true := by decide +kernel
+theorem depth3 : quickCheck 3 = true := by decide +kernel
+theorem depth4 : quickCheck 4 = true := by decide +kernel
+theorem depth5 : quickCheck 5 = true := by decide +kernel
+theorem depth6 : quickCheck 6 = true := by decide +kernel
+theorem depth7 : quickCheck 7 = true := by decide +kernel
+
+theorem allQuick : ∀ d : Fin 8, quickCheck d.val = true := by
+  intro d
+  have disj : d.val=0 ∨ d.val=1 ∨ d.val=2 ∨ d.val=3 ∨ d.val=4 ∨ d.val=5 ∨ d.val=6 ∨ d.val=7 := by
+    have := d.isLt
+    omega
+  rcases disj with h|h|h|h|h|h|h|h
+  · exact Eq.mpr (congrArg (fun n => quickCheck n = true) h) depth0
+  · exact Eq.mpr (congrArg (fun n => quickCheck n = true) h) depth1
+  · exact Eq.mpr (congrArg (fun n => quickCheck n = true) h) depth2
+  · exact Eq.mpr (congrArg (fun n => quickCheck n = true) h) depth3
+  · exact Eq.mpr (congrArg (fun n => quickCheck n = true) h) depth4
+  · exact Eq.mpr (congrArg (fun n => quickCheck n = true) h) depth5
+  · exact Eq.mpr (congrArg (fun n => quickCheck n = true) h) depth6
+  · exact Eq.mpr (congrArg (fun n => quickCheck n = true) h) depth7
+
+theorem cert : ∀ d : Fin 8, check d.val = true := by
+  intro d
+  apply List.all_eq_true.mpr
+  intro i hi
+  apply List.all_eq_true.mpr
+  intro a ha
+  apply decide_eq_true
+  have v := List.all_eq_true.mp (List.all_eq_true.mp (allQuick d) i hi) a ha
+  have av : (Fin.ofNat 48 a).val = a := Nat.mod_eq_of_lt (List.mem_range.mp ha)
+  unfold one
+  dsimp only
+  rw [av]
+  have v' := Bool.and_eq_true_iff.mp v
+  refine ⟨of_decide_eq_true v'.1,?_⟩
+  intro p hp
+  have hit := congrArg (fun m : Nat => m.testBit p.val) (eq_of_beq v'.2)
+  rw [Nat.testBit_and,hp,Bool.true_and,eval24,finals24] at hit
+  exact hit
+
+
+theorem stepFront {d i : Nat} (hd : d<8) (hi : i<size d) (a : Act) :
+    ∃ j < size (d+1), Below board (Orbits.Step board (cap d i) a) (cap (d+1) j) := by
+  have ok := List.all_eq_true.mp (List.all_eq_true.mp (cert ⟨d,hd⟩) i (List.mem_range.mpr hi)) a.val (List.mem_range.mpr a.isLt)
+  have actEq : Fin.ofNat 48 a.val = a := Fin.ext (Nat.mod_eq_of_lt a.isLt)
+  change decide (one d i (Fin.ofNat 48 a.val)) = true at ok
+  rw [actEq] at ok
+  obtain ⟨range,hits⟩ := of_decide_eq_true ok
+  let o := Fin.ofNat 144 (pointer d i a.val / 128)
+  exact ⟨_,range,symmetry o,fun p h => hits p (stepToMove _ a h)⟩
+
+theorem absent : ∀ d : Fin 9, ∀ i : Fin (size d.val), ∃ p : Pt,
+    ((levels[d.val]!)[i.val]!).testBit p.val = false := by decide +kernel
+
+theorem hard (xs : List (Fin 48)) (short : xs.length ≤ 8) :
+    ¬ ∀ p : PP, isMarked (xs.foldl (fun s a => move s a.val) 0) p := by
+  apply fromFrontier (B := board) cap size (fun _ hd _ hi a => stepFront hd hi a)
+    asPoints (fun s a => move s a.val) moveToStep _ 0 _ xs short
+  · intro d hd i hi
+    obtain ⟨p,hp⟩ := absent ⟨d,by omega⟩ ⟨i,hi⟩
+    exact ⟨p,by intro m; change _ = true at m; simp [hp] at m⟩
+  · refine ⟨0,by decide,belowSubset ?_⟩
+    intro p hp; change (0 : Nat).testBit p.val = true at hp; simp at hp
+
+end PCX150.OrbitCert
