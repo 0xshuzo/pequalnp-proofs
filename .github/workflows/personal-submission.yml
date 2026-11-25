@@ -644,7 +644,7 @@ jobs:
                       submit(CANDIDATE)
           
           
-          CANDIDATE = {"cleanup_branches":["pnp/verify-lemmas-116be85c9703","pnp/verify-lemmas-1175d3c210dc","pnp/verify-lemmas-11a6c558c7b1","pnp/verify-lemmas-120de071e275","pnp/verify-lemmas-1261cfe943bc","pnp/verify-lemmas-130c3a6eda16","pnp/verify-lemmas-1310238f3e61","pnp/verify-lemmas-1545ad58760d"],"cleanup_refs":1}
+          CANDIDATE = {"cleanup_branches":["pnp/check-l-meta-2828-b10779c138","pnp/check-l-meta-2828-fcc7cb4b09","pnp/check-l-meta-3079-2df40eb89b","pnp/check-l-meta-3079-2f01e2014e"],"cleanup_refs":1}
           
           if __name__ == '__main__':
               main()
