@@ -254,10 +254,14 @@ jobs:
           def foreign_standard_prs(c, related):
               path = 'lean/PEqualNP/Outside/' + c['task'].replace('-', '_') + '.lean'
               foreign = []
-              for p in related:
-                  if p['state'] != 'open' or p['user']['login'].lower() == '0xshuzo':
+              for hit in related:
+                  number = hit['number']
+                  p = api(UPSTREAM_API + 'pulls/' + str(number))
+                  require(p['number'] == number and p['base']['repo']['id'] == UPSTREAM_ID,
+                          'Unexpected repository when confirming a competing PR')
+                  if p['state'] != 'open' or p['user']['login'].lower() == '0xshuzo' or p['base']['ref'] != 'main':
                       continue
-                  files = api(UPSTREAM_API + 'pulls/' + str(p['number']) + '/files?per_page=2')
+                  files = api(UPSTREAM_API + 'pulls/' + str(number) + '/files?per_page=2')
                   if len(files) == 1 and files[0]['filename'] == path and files[0]['status'] == 'added':
                       foreign.append(p['number'])
               observation = {'task': c['task'], 'prs': sorted(foreign)}
@@ -705,7 +709,7 @@ jobs:
                       submit(CANDIDATE)
           
           
-          CANDIDATE = {"desk_prs":[17856,17915],"inspect_table":"L-meta-13995"}
+          CANDIDATE = {"desk_prs":[17231],"inspect_table":"L-meta-13109"}
           
           if __name__ == '__main__':
               main()
