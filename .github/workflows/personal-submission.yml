@@ -553,7 +553,25 @@ jobs:
               print('CLOSED_TOTAL',len(rows),flush=True)
           
           
-          def fork_refs_in_upstream_prs():
+          def fork_refs_in_upstream_prs(branches_to_check=()):
+              if branches_to_check:
+                  require(len(branches_to_check)<=50 and len(set(branches_to_check))==len(branches_to_check) and
+                          all(re.fullmatch(r'pnp/(?:verify-lemmas-[0-9a-f]{12}|check-l-[a-z]+-[0-9]+-[0-9a-f]{10})',b)
+                              for b in branches_to_check), 'Invalid cleanup branch selection')
+                  started=int(time.time())
+                  protected=[]
+                  for branch in branches_to_check:
+                      path=UPSTREAM_API+'pulls?'+urlencode(dict(state='open',head='0xshuzo:'+branch,per_page=1))
+                      matches=api(path)
+                      require(isinstance(matches,list) and all(p['state']=='open' and p['base']['repo']['id']==UPSTREAM_ID
+                              and p['head']['ref']==branch for p in matches), 'Unexpected branch-specific PR response')
+                      if matches:protected.append(branch)
+                  info=json.loads(gh('api','--hostname','github.com','graphql','-f',
+                              'query={repository(owner:"open-goat",name:"pequalnp-proofs"){databaseId pullRequests(states:OPEN,first:1){totalCount}}}').stdout)['data']['repository']
+                  require(info['databaseId']==UPSTREAM_ID,'Unexpected repository for branch inventory')
+                  print('UPSTREAM_FORK_REFS',json.dumps(dict(repo=UPSTREAM,repo_id=UPSTREAM_ID,fork=FORK,
+                        observed_at=started,branches=protected,coverage=list(branches_to_check),total_open=info['pullRequests']['totalCount'])),flush=True)
+                  return
               query = '''query($endCursor:String) {
                 repository(owner:"open-goat",name:"pequalnp-proofs") {
                   databaseId pullRequests(first:100,states:OPEN,after:$endCursor,orderBy:{field:CREATED_AT,direction:ASC}) {
@@ -612,7 +630,7 @@ jobs:
                           repo['default_branch'] == 'main', 'Unexpected upstream')
                   print('PERSONAL_LOGIN_CONFIRMED 0xshuzo', flush=True)
                   if 'cleanup_refs' in CANDIDATE:
-                      fork_refs_in_upstream_prs()
+                      fork_refs_in_upstream_prs(CANDIDATE.get('cleanup_branches',[]))
                   elif 'capacity' in CANDIDATE:
                       reduction_capacity()
                   elif 'closures' in CANDIDATE:
@@ -623,7 +641,7 @@ jobs:
                       submit(CANDIDATE)
           
           
-          CANDIDATE = {"cleanup_refs":1}
+          CANDIDATE = {"cleanup_branches":["pnp/verify-lemmas-045053f30f7e","pnp/verify-lemmas-04eb0602cf33","pnp/verify-lemmas-0510c3272113","pnp/verify-lemmas-0576599becab","pnp/verify-lemmas-05f0d451fdd9","pnp/verify-lemmas-05f2793ec3f7","pnp/verify-lemmas-0669fb4c0d8a","pnp/verify-lemmas-06e3be78296e"],"cleanup_refs":1}
           
           if __name__ == '__main__':
               main()
