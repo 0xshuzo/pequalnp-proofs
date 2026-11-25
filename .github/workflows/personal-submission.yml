@@ -19,6 +19,7 @@ jobs:
         run: |
           """Run on the dedicated fork branch, without checking out PR or proof code."""
           import base64
+          import hashlib
           import json
           import os
           import re
@@ -109,6 +110,68 @@ jobs:
               require(expected <= {s.strip() for s in lines}, 'Checker inputs differ from proof')
           
           
+          def reduction_capacity():
+              """Count each registered or pending cut once, using the account's repository PRs."""
+              # This endpoint lists PRs by creator directly, including newly opened PRs before search indexing.
+              query = UPSTREAM_API + 'issues?creator=0xshuzo&state=all&per_page=100'
+              pages = json.loads(gh('api','--hostname','github.com','--paginate','--slurp',query).stdout)
+              pulls = {}
+              for page in pages:
+                  for issue in page:
+                      if 'pull_request' not in issue:
+                          continue
+                      require(issue['user']['login']=='0xshuzo', 'Unexpected PR creator')
+                      n = issue['number']
+                      if issue['state']=='open':
+                          pulls[n] = 'open'
+                      else:
+                          info = issue['pull_request']
+                          if 'merged_at' not in info:
+                              info = api(UPSTREAM_API+'pulls/'+str(n))
+                          if info['merged_at']:
+                              pulls[n] = 'merged'
+              raw = subprocess.check_output(['curl','-fsS','--max-time','25','--max-filesize','25000000',
+                                             '-H','Cache-Control: no-cache','https://data.pequalnp.com/data/desk/gaps.json'],
+                                            env={'PATH':os.environ['PATH']})
+              desk = json.loads(raw)
+              require(desk['repo']=='https://github.com/'+UPSTREAM, 'Unexpected desk repository')
+              states = {}
+              for row in desk['reductions']:
+                  artifact = row['artifact']
+                  states.setdefault(artifact['lean_file'], {}).setdefault(artifact['content_hash'], set()).add(row['state'])
+              registered, pending = {}, {}
+              by_blob = {}
+              for n, status in pulls.items():
+                  files = api(UPSTREAM_API+'pulls/'+str(n)+'/files?per_page=100')
+                  require(len(files)<100,'PR files incomplete during reduction count')
+                  for f in files:
+                      path, blob = f['filename'],f['sha']
+                      if f['status']!='added' or not re.fullmatch(r'lean/PEqualNP/Outside/R_[a-z]+_[0-9]+_[0-9]+\.lean',path):
+                          continue
+                      require(re.fullmatch('[0-9a-f]{40}',blob),'Invalid reduction blob')
+                      key = (path,blob)
+                      recorded = set()
+                      if path in states:
+                          if blob not in by_blob:
+                              obj = api(UPSTREAM_API+'git/blobs/'+blob)
+                              require(obj['sha']==blob and obj['encoding']=='base64', 'Reduction blob unavailable')
+                              content = base64.b64decode(obj['content'])
+                              require(len(content)==obj['size'], 'Incomplete reduction blob')
+                              by_blob[blob] = 'sha256:'+hashlib.sha256(content).hexdigest()
+                          recorded = states[path].get(by_blob[blob],set())
+                      if 'open' in recorded:
+                          registered.setdefault(key, set()).add(n)
+                      elif not recorded:
+                          # A merge can precede its publication in the desk export. Keep its reservation during the gap.
+                          pending.setdefault(key, set()).add(n)
+              recorded_prs = sorted(n for ns in registered.values() for n in ns)
+              reserved_prs = sorted(n for ns in pending.values() for n in ns)
+              summary = dict(registered=len(registered), pending=len(pending), occupied=len(set(registered)|set(pending)),
+                             registered_prs=recorded_prs, reserved_prs=reserved_prs, desk_updated_at=desk['updated_at'])
+              print('REDUCTION_CAPACITY',json.dumps(summary),flush=True)
+              return summary
+          
+          
           def submit(c):
               suffixes = ('-resume', '-standard') if c['kind'] == 'check' else ('-resume',)
               branches = {'pnp/' + c['task'].lower() + suffix for suffix in suffixes}
@@ -151,6 +214,9 @@ jobs:
                                            for p in related), 'Own source or task PR already exists')
               require({p['number'] for p in related if p['state'] == 'open'} == checked_competitors,
                       'Competition changed during verification; recheck before submitting')
+              if c['kind']=='reduce' and reduction_capacity()['occupied']>=5:
+                  print('REDUCTION_HELD',c['task'],c['sha'],flush=True)
+                  raise SystemExit('All five reduction places are registered or reserved')
               require(time.time() < c['until'], 'Lease confirmation expired')
               cmd = gh('pr', 'create', '--repo', UPSTREAM, '--base', 'main', '--head',
                        '0xshuzo:' + c['branch'], '--title', c['task'], '--body', '',
@@ -332,7 +398,9 @@ jobs:
                   require(repo['full_name'] == UPSTREAM and repo['id'] == UPSTREAM_ID and
                           repo['default_branch'] == 'main', 'Unexpected upstream')
                   print('PERSONAL_LOGIN_CONFIRMED 0xshuzo', flush=True)
-                  if 'closures' in CANDIDATE:
+                  if 'capacity' in CANDIDATE:
+                      reduction_capacity()
+                  elif 'closures' in CANDIDATE:
                       closure_inventory()
                   elif 'audit' in CANDIDATE:
                       audit(CANDIDATE['audit'])
@@ -340,7 +408,7 @@ jobs:
                       submit(CANDIDATE)
           
           
-          CANDIDATE = {"audit":[6692,6967,7271,7355,8263,8268,8270,8280,8379,8672,8740,8746,8815,8947,8986,9000,9086,9120,9225,9255,9316,9336,9476,9485,9540,9596,9645,9659,9773,9972,9990,10012,10062,10094,10111,10117,10288,10329,10338,10423,10428,10432,10486,10505,10599,10610,10625,10629,10662,10683,10686,10702,10709,10727,10730,10798,10802,10831,10851,10857,10904,10907,10926,10946,10950,10973,11046,11083,11100,11105,11176,11251,12017,12203,12703,12861],"inspect_steps":[{"gap":"L-meta-670","prs":[12624]},{"gap":"L-meta-8443","prs":[]},{"gap":"L-meta-8525","prs":[]}],"public_runs":{"10428":"45501842211","10432":"45501847813","12703":"45561077971","12861":"45566909850","6967":"45435012822","7355":"45436578329","8815":"45477475396","9000":"45474201952","9225":"45474622265","9972":"45489438368"}}
+          CANDIDATE = {"capacity":1}
           
           if __name__ == '__main__':
               main()
