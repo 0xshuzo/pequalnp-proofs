@@ -716,7 +716,7 @@ jobs:
                       submit(CANDIDATE)
           
           
-          CANDIDATE = {"inspect_tables":[{"prs":[17930],"step":"L-meta-13691"},{"prs":[16722,17452],"step":"L-meta-12735"}]}
+          CANDIDATE = {"inspect_tables":[{"prs":[17906],"step":"L-meta-13517"},{"prs":[17612,17649,17993],"step":"L-meta-14035"}]}
           
           if __name__ == '__main__':
               main()
