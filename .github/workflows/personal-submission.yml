@@ -455,6 +455,12 @@ jobs:
           
           
           def audit(numbers):
+              for saved in CANDIDATE.get('deferred_tables', []):
+                  step = saved['step']
+                  require(re.fullmatch(r'L-[a-z]+-[0-9]+',step),'Invalid deferred task')
+                  query = {'task':step,'branch':'pnp/'+step.lower()+'-resume','desk_prs':saved['prs']}
+                  _, related = current_prs(query)
+                  foreign_standard_prs(query, related)
               import io
               import zipfile
               for inspect in CANDIDATE.get('inspect_steps', []):
@@ -709,7 +715,7 @@ jobs:
                       submit(CANDIDATE)
           
           
-          CANDIDATE = {"desk_prs":[17231],"inspect_table":"L-meta-13109"}
+          CANDIDATE = {"desk_prs":[17543],"inspect_table":"L-meta-13271"}
           
           if __name__ == '__main__':
               main()
