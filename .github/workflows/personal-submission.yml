@@ -626,6 +626,10 @@ jobs:
               with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as auth:
                   gh_env.update(GH_TOKEN=token, GH_CONFIG_DIR=auth, GH_HOST='github.com',
                                 GH_PROMPT_DISABLED='1', GH_NO_UPDATE_NOTIFIER='1')
+                  if not CANDIDATE:
+                      quotas = api('rate_limit')['resources']
+                      print('PERSONAL_QUOTA', json.dumps({key:{name:quotas[key][name]
+                            for name in ('limit','remaining','reset')} for key in ('core','search','graphql')}), flush=True)
                   who = gh('api', '--hostname', 'github.com', 'user', '--jq', '.login', check=False)
                   require(who.returncode == 0 and who.stdout.strip() == '0xshuzo', 'Personal login failed')
                   headers = gh('api', '--hostname', 'github.com', '-i', 'user').stdout.split('\n\n',1)[0]
@@ -649,7 +653,7 @@ jobs:
                       submit(CANDIDATE)
           
           
-          CANDIDATE = {"base":"f28422a8507dff591d7644e623a9c5dee88a8818","blob":"2a9465de9af2d73195bf1436ba1ddd37ea73fbcd","branch":"pnp/l-meta-10596-resume","ci_sha":"9ffe8d3b6fd312066b20d031c0ce5dba0a989218","desk_prs":[15445,15530],"file":"lean/PEqualNP/Outside/L_meta_10596.lean","kind":"check","leased_task":"L-meta-10597","run":"45639394733","sha":"9ffe8d3b6fd312066b20d031c0ce5dba0a989218","statement":"d40eab78c9b924773582389e745eaf0128cb67e034b8673b4c9050c9f5f741a1","task":"L-meta-10596","until":1795619007}
+          CANDIDATE = {}
           
           if __name__ == '__main__':
               main()
