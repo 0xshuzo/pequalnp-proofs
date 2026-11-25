@@ -716,7 +716,7 @@ jobs:
                       submit(CANDIDATE)
           
           
-          CANDIDATE = {"base":"ed419030b2f93e3f357003611f865f28e436bd9a","blob":"f4de5c58c34ca2d3b918f1333de413896179e1ca","branch":"pnp/l-meta-14084-resume","ci_sha":"d1bff8a7526db5b44405185a2bca3c7abd92afba","defer_competing_table":false,"desk_prs":[],"file":"lean/PEqualNP/Outside/L_meta_14084.lean","kind":"check","leased_task":"L-meta-14084","run":"45669806345","sha":"d1bff8a7526db5b44405185a2bca3c7abd92afba","statement":"1ac649359d0e66bc940fd82e8a3bac5216167c64a3d6b0d30f8546b61ce157b5","task":"L-meta-14084","until":1795629820}
+          CANDIDATE = {'task': 'L-meta-14084', 'defer_competing_table': False, 'leased_task': 'L-meta-14084', 'file': 'lean/PEqualNP/Outside/L_meta_14084.lean', 'branch': 'pnp/l-meta-14084-resume', 'kind': 'check', 'run': '45669806345', 'ci_sha': 'd1bff8a7526db5b44405185a2bca3c7abd92afba', 'desk_prs': [], 'sha': 'd1bff8a7526db5b44405185a2bca3c7abd92afba', 'base': 'ed419030b2f93e3f357003611f865f28e436bd9a', 'blob': 'f4de5c58c34ca2d3b918f1333de413896179e1ca', 'statement': '1ac649359d0e66bc940fd82e8a3bac5216167c64a3d6b0d30f8546b61ce157b5', 'until': 1795629900}
           
           if __name__ == '__main__':
               main()
