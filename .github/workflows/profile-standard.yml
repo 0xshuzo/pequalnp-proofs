@@ -1,0 +1,120 @@
+name: Profile standard proof resource usage
+'on':
+  push:
+    branches:
+    - pnp/profile-l-meta-15074-333dea283c75
+permissions: {}
+jobs:
+  profile:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 55
+    env:
+      GAPS_URL: https://data.pequalnp.com/data/desk/gaps.json
+      ELAN_VERSION: v4.4.0
+      ELAN_SHA256: 0e8250aa2be86c7af929ade68db617af9edc8b9ccf6eaf5ece228250d0d032e2
+      PROOF_SHA: 333dea283c752b9082b2a5b6bf5b403a85b16125
+    steps:
+    - name: Fetch the pinned proof from the fork
+      run: 'set -eu
+
+        git init -q .
+
+        git fetch -q --no-tags --depth=2 https://github.com/0xshuzo/pequalnp-proofs.git
+        "$PROOF_SHA"
+
+        git checkout -q --detach FETCH_HEAD
+
+        test "$(git rev-parse HEAD)" = "$PROOF_SHA"
+
+        '
+    - name: The pull request must add exactly one proof file
+      id: one
+      run: "set -eu\n# What changed between the base side of the merge and its result.\
+        \ -z keeps odd file names whole.\ngit diff -z --name-status --no-renames 'HEAD^1'\
+        \ HEAD > \"$RUNNER_TEMP/changed\"\nn=$(tr -cd '\\0' < \"$RUNNER_TEMP/changed\"\
+        \ | wc -c)\nif ! tr '\\0' '\\n' < \"$RUNNER_TEMP/changed\" | grep -q '^lean/PEqualNP/Outside/';\
+        \ then\n  echo \"ADVISORY: this pull request adds no proof file. Nothing to\
+        \ check.\"\n  echo \"run=no\" >> \"$GITHUB_OUTPUT\"; exit 0\nfi\nstatus=$(tr\
+        \ '\\0' '\\n' < \"$RUNNER_TEMP/changed\" | sed -n 1p)\nfile=$(tr '\\0' '\\\
+        n' < \"$RUNNER_TEMP/changed\" | sed -n 2p)\n[ \"$n\" -eq 2 ] && [ \"$status\"\
+        \ = A ] || { echo \"REFUSED: a pull request may add exactly one file and change\
+        \ nothing else\"; exit 1; }\nprintf '%s' \"$file\" | grep -Eqx 'lean/PEqualNP/Outside/L_[a-z0-9_]+\\\
+        .lean' || { echo \"REFUSED: the file must be lean/PEqualNP/Outside/L_<gap>.lean\"\
+        ; exit 1; }\n[ -f \"$file\" ] && [ ! -L \"$file\" ] || { echo \"REFUSED: the\
+        \ file must be a plain file, not a link\"; exit 1; }\n[ \"$(wc -c < \"$file\"\
+        )\" -le 524288 ] || { echo \"REFUSED: the file is larger than 512 KiB\"; exit\
+        \ 1; }\necho \"run=yes\" >> \"$GITHUB_OUTPUT\"\necho \"FILE=$file\" >> \"\
+        $GITHUB_ENV\"\n"
+    - name: The posted statement and the import rule
+      if: steps.one.outputs.run == 'yes'
+      run: 'set -eu
+
+        mkdir -p "$RUNNER_TEMP/in"
+
+        curl -sSf --proto ''=https'' --max-redirs 0 --max-filesize 12000000 -o "$RUNNER_TEMP/in/gaps.json"
+        "$GAPS_URL"
+
+        node .github/scripts/outside-guard.mjs gap-of-file "$RUNNER_TEMP/in/gaps.json"
+        "$FILE" "$RUNNER_TEMP/in"
+
+        node .github/scripts/outside-guard.mjs imports "$FILE" "$RUNNER_TEMP/in/imports.json"
+        "$FILE"
+
+        echo "gap: $(cat "$RUNNER_TEMP/in/gap.id")"
+
+        '
+    - name: Install the pinned Lean toolchain
+      if: steps.one.outputs.run == 'yes'
+      run: 'set -eu
+
+        # The installer pinned by release and sha256 (.github/scripts/install-elan.sh,
+        as in authoritative.yml).
+
+        # The script is read from the BASE side of the merge (HEAD^1), never from
+        the pull request''s copy.
+
+        # (A fork can still rewrite this whole file in its own pull_request run; that
+        is why this check is advisory.)
+
+        git show ''HEAD^1:.github/scripts/install-elan.sh'' > "$RUNNER_TEMP/install-elan.sh"
+
+        sh "$RUNNER_TEMP/install-elan.sh" "$ELAN_VERSION" "$ELAN_SHA256" "$HOME/.elan"
+        "$(cat lean/lean-toolchain)"
+
+        echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+
+        '
+    - name: Fetch the prebuilt Mathlib
+      if: steps.one.outputs.run == 'yes'
+      working-directory: lean
+      run: lake exe cache get
+    - name: Swap space for the verifier
+      if: steps.one.outputs.run == 'yes'
+      run: "set -eu\n# The verifier needs more memory than a standard runner has for\
+        \ a proof that imports\n# all of Mathlib; without swap the run hangs (see\
+        \ authoritative.yml, the same step).\nsudo rm -rf /usr/local/lib/android /opt/ghc\
+        \ /usr/local/.ghcup /usr/share/swift /opt/hostedtoolcache/CodeQL\nd=$(df -m\
+        \ --output=avail,target / /mnt 2>/dev/null | awk 'NR>1' | sort -rn | awk 'NR==1{print\
+        \ $2}')\nmb=$(( $(df -m --output=avail \"$d\" | awk 'NR==2{print $1}') - 6144\
+        \ ))\n[ \"$mb\" -le 12288 ] || mb=12288\nif [ \"$mb\" -ge 1024 ]; then\n \
+        \ f=\"${d%/}/pnp-swap\"\n  sudo fallocate -l \"${mb}M\" \"$f\" && sudo chmod\
+        \ 600 \"$f\"\n  sudo mkswap -q \"$f\" && sudo swapon \"$f\"\nfi\nfree -m\n"
+    - name: Measure checker stages on the pinned commit
+      if: steps.one.outputs.run == 'yes'
+      timeout-minutes: 32
+      run: "set -eu\n# The machine the authoritative check runs on (authoritative.yml,\
+        \ the same step): two\n# cores, at most 6.5 GB of memory with the rest in\
+        \ swap, and 20 minutes. Without\n# them the 4 core, 16 GB runner starved and\
+        \ lost contact with GitHub, with no log.\ncap=$(( $(awk '/^MemTotal:/{print\
+        \ $2}' /proc/meminfo) - 1572864 ))\n[ \"$cap\" -le 6815744 ] || cap=6815744\n\
+        counts() {\n  grep '^checker stage:' \"$RUNNER_TEMP/err\" || true\n  find\
+        \ lean/.lake/build/lib/lean/PEqualNP -type f -name '*.olean' 2>/dev/null |\
+        \ wc -l || true\n  if test -f \"lean/.lake/build/lib/lean/PEqualNP/Outside/$(basename\
+        \ \"$FILE\" .lean).olean\"; then\n    echo 'Proof object present'\n  fi\n\
+        }\n(sleep 1200; echo \"At the project's twenty-minute deadline\"; counts)\
+        \ &\nmonitor_pid=$!\ntrap 'kill \"$monitor_pid\" 2>/dev/null || true' EXIT\n\
+        set +e\nsudo systemd-run --quiet --scope --collect -p MemoryMax=\"${cap}K\"\
+        \ --uid=\"$(id -u)\" --gid=\"$(id -g)\" \\\n  env HOME=\"$HOME\" PATH=\"$PATH\"\
+        \ taskset -c 0,1 timeout -k 30 1680 \\\n  node tools/check-lean.mjs \"$FILE\"\
+        \ \"$RUNNER_TEMP/in/statement.txt\" check > \"$RUNNER_TEMP/out\" 2> \"$RUNNER_TEMP/err\"\
+        \ncode=$?\necho \"Profiling exit code $code\"\ncounts\nexit \"$code\"\n"
