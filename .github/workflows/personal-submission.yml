@@ -120,6 +120,8 @@ jobs:
                   if other['state'] == 'open':
                       files = api(UPSTREAM_API + 'pulls/' + str(other['number']) + '/files')
                       same_path = [f for f in files if f['filename'] == c['file']]
+                      if c['kind']=='reduce':
+                          require(not same_path, 'A reduction already uses this Lean module in an open PR')
                       for f in same_path:
                           require(f.get('sha') and f['sha'] != c['blob'],
                                   'The same proof file already exists in an open PR')
@@ -270,7 +272,7 @@ jobs:
                       submit(CANDIDATE)
           
           
-          CANDIDATE = {"audit":[6692,6967,7271,7355,8263,8268,8270,8280,8379,8672,8740,8746,8815,8947,8986,9000,9086,9120,9225,9255,9316,9336,9476,9485,9540,9596,9645,9659,9773,9972,9990,10012,10062,10094,10111,10117,10288,10329,10338,10423,10428,10432,10486,10505,10599,10610,10625,10629,10662,10683,10686,10702,10709,10727,10730,10798,10802,10831,10851,10857,10904,10907,10926,10946,10950,10973,11046,11083],"inspect":{"gap":"L-meta-4835","prs":[10858,10908]},"public_runs":{"10432":"45501847813","6967":"45435012822","7355":"45436578329","8815":"45477475396","9000":"45474201952","9225":"45474622265"}}
+          CANDIDATE = {"base":"51ca0c7a582164679d9c932ea01184fc1284b5a7","blob":"ab805e3163b07c9ec48d01c00c81381ec4e4b62a","branch":"pnp/l-meta-5264-resume","ci_sha":"e29926c5332288d0c81397f9fd30473e9cef9cb5","file":"lean/PEqualNP/Outside/R_meta_5264_729.lean","kind":"reduce","run":"45519477979","sha":"82eed138fc6b34d9a9f5b6646fe95cb1f95593fe","statement":"91429b5902c99d7a2070c0d77f92be532da2c74a652760c990c2d1ce905e987a","task":"L-meta-5264","until":1795568022}
           
           if __name__ == '__main__':
               main()
