@@ -553,6 +553,36 @@ jobs:
               print('CLOSED_TOTAL',len(rows),flush=True)
           
           
+          def fork_refs_in_upstream_prs():
+              query = '''query($endCursor:String) {
+                repository(owner:"open-goat",name:"pequalnp-proofs") {
+                  databaseId pullRequests(first:100,states:OPEN,after:$endCursor) {
+                    totalCount pageInfo { hasNextPage endCursor }
+                    nodes { number headRefName headRepository { nameWithOwner } }
+                  }
+                }
+              }'''
+              response = gh('api','--hostname','github.com','graphql','--paginate','--slurp','-f','query='+query)
+              branches = set()
+              numbers = set()
+              totals = []
+              pages = json.loads(response.stdout)
+              require(bool(pages),'Empty cleanup PR inventory')
+              for page in pages:
+                  repo = page['data']['repository']
+                  require(repo['databaseId']==UPSTREAM_ID,'Unexpected cleanup inventory repository')
+                  prs = repo['pullRequests']
+                  totals.append(prs['totalCount'])
+                  for row in prs['nodes']:
+                      numbers.add(row['number'])
+                      if (row['headRepository'] or {}).get('nameWithOwner')==FORK:
+                          branches.add(row['headRefName'])
+              require(not prs['pageInfo']['hasNextPage'] and len(numbers)==totals[-1] and len(set(totals))==1,
+                      'Open upstream PR inventory changed during pagination')
+              print('UPSTREAM_FORK_REFS',json.dumps(dict(repo=UPSTREAM,repo_id=UPSTREAM_ID,fork=FORK,
+                    observed_at=int(time.time()),branches=sorted(branches),total_open=len(numbers))),flush=True)
+          
+          
           def main():
               global gh_env
               require(os.getenv('GITHUB_REPOSITORY') == FORK and
@@ -577,7 +607,9 @@ jobs:
                   require(repo['full_name'] == UPSTREAM and repo['id'] == UPSTREAM_ID and
                           repo['default_branch'] == 'main', 'Unexpected upstream')
                   print('PERSONAL_LOGIN_CONFIRMED 0xshuzo', flush=True)
-                  if 'capacity' in CANDIDATE:
+                  if 'cleanup_refs' in CANDIDATE:
+                      fork_refs_in_upstream_prs()
+                  elif 'capacity' in CANDIDATE:
                       reduction_capacity()
                   elif 'closures' in CANDIDATE:
                       closure_inventory()
@@ -587,7 +619,7 @@ jobs:
                       submit(CANDIDATE)
           
           
-          CANDIDATE = {"capacity":1}
+          CANDIDATE = {"cleanup_refs":1}
           
           if __name__ == '__main__':
               main()
