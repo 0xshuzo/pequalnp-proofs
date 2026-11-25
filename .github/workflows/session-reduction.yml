@@ -1,0 +1,62 @@
+name: Verify posted reduction
+on:
+  push:
+    branches:
+      - pnp/check-l-meta-4594-11d1e2e224
+permissions:
+  contents: none
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      BASE_SHA: 2412d8a5a9ad23ec58ed6bea71615d05ae44ca10
+      PROOF_SHA: 11d1e2e224a042e432bad09c657ce3c13a43b6bd
+      MODULE: PEqualNP.Outside.R_meta_4594_1
+      BLOB_SHA: daad0ff1af891110b2f3c50965d2b67bba3cb337
+      PROOF_FILE: lean/PEqualNP/Outside/R_meta_4594_1.lean
+    steps:
+      - name: Fetch the pinned proof commit
+        run: |
+          set -eu
+          git init -q .
+          git fetch -q --no-tags --depth 2 https://github.com/0xshuzo/pequalnp-proofs.git "$PROOF_SHA"
+          git checkout -q --detach FETCH_HEAD
+          test "$(git rev-parse HEAD)" = "$PROOF_SHA"
+          test "$(git rev-parse HEAD^1)" = "$BASE_SHA"
+          test "$(git hash-object "$PROOF_FILE")" = "$BLOB_SHA"
+          test "$(git diff --name-only HEAD^1 HEAD)" = "$PROOF_FILE"
+      - name: Check the posted reduction and allowed imports
+        run: |
+          set -eu
+          mkdir -p "$RUNNER_TEMP/statement"
+          curl -fsS --proto '=https' --max-redirs 0 --max-filesize 12000000 -o "$RUNNER_TEMP/statement/gaps.json" https://data.pequalnp.com/data/desk/gaps.json
+          node .github/scripts/outside-guard.mjs gap "$RUNNER_TEMP/statement/gaps.json" L-meta-4594 "$PROOF_FILE" "$RUNNER_TEMP/statement" reduce
+          node .github/scripts/outside-guard.mjs imports "$PROOF_FILE" "$RUNNER_TEMP/statement/imports.json" "$PROOF_FILE" reduce
+      - name: Install the project's Lean toolchain
+        run: |
+          set -eu
+          curl -fsSL https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh | sh -s -- -y --default-toolchain none
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+          "$HOME/.elan/bin/elan" toolchain install "$(cat lean/lean-toolchain)"
+      - name: Fetch pinned Mathlib cache
+        working-directory: lean
+        run: lake exe cache get
+      - name: Compile the assigned module with full diagnostics
+        working-directory: lean
+        run: |
+          set -eu
+          marker="lean-$(cat /proc/sys/kernel/random/uuid)"
+          echo "::stop-commands::$marker"
+          if lake build "+$MODULE"; then status=0; else status=$?; fi
+          echo "::$marker::"
+          exit "$status"
+      - name: Run the reduction checker
+        timeout-minutes: 25
+        run: |
+          set -eu
+          marker="reduction-$(cat /proc/sys/kernel/random/uuid)"
+          echo "::stop-commands::$marker"
+          if taskset -c 0,1 timeout -k 30 1200 node tools/check-lean.mjs "$PROOF_FILE" "$RUNNER_TEMP/statement/statement.txt" reduce; then status=0; else status=$?; fi
+          echo "::$marker::"
+          exit "$status"
