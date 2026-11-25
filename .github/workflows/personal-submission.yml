@@ -556,29 +556,33 @@ jobs:
           def fork_refs_in_upstream_prs():
               query = '''query($endCursor:String) {
                 repository(owner:"open-goat",name:"pequalnp-proofs") {
-                  databaseId pullRequests(first:100,states:OPEN,after:$endCursor) {
+                  databaseId pullRequests(first:100,states:OPEN,after:$endCursor,orderBy:{field:CREATED_AT,direction:ASC}) {
                     totalCount pageInfo { hasNextPage endCursor }
                     nodes { number headRefName headRepository { nameWithOwner } }
                   }
                 }
               }'''
-              response = gh('api','--hostname','github.com','graphql','--paginate','--slurp','-f','query='+query)
-              branches = set()
-              numbers = set()
-              totals = []
-              pages = json.loads(response.stdout)
-              require(bool(pages),'Empty cleanup PR inventory')
-              for page in pages:
-                  repo = page['data']['repository']
-                  require(repo['databaseId']==UPSTREAM_ID,'Unexpected cleanup inventory repository')
-                  prs = repo['pullRequests']
-                  totals.append(prs['totalCount'])
-                  for row in prs['nodes']:
-                      numbers.add(row['number'])
-                      if (row['headRepository'] or {}).get('nameWithOwner')==FORK:
-                          branches.add(row['headRefName'])
-              require(not prs['pageInfo']['hasNextPage'] and len(numbers)==totals[-1] and len(set(totals))==1,
-                      'Open upstream PR inventory changed during pagination')
+              for _ in range(3):
+                  response = gh('api','--hostname','github.com','graphql','--paginate','--slurp','-f','query='+query)
+                  branches = set()
+                  numbers = set()
+                  totals = []
+                  pages = json.loads(response.stdout)
+                  require(bool(pages),'Empty cleanup PR inventory')
+                  for page in pages:
+                      repo = page['data']['repository']
+                      require(repo['databaseId']==UPSTREAM_ID,'Unexpected cleanup inventory repository')
+                      prs = repo['pullRequests']
+                      totals.append(prs['totalCount'])
+                      for row in prs['nodes']:
+                          numbers.add(row['number'])
+                          if (row['headRepository'] or {}).get('nameWithOwner')==FORK:
+                              branches.add(row['headRefName'])
+                  require(not prs['pageInfo']['hasNextPage'], 'Incomplete upstream branch inventory')
+                  if len(numbers)==totals[-1] and len(set(totals))==1:
+                      break
+              else:
+                  raise SystemExit('Open upstream PR inventory changed during three complete reads')
               print('UPSTREAM_FORK_REFS',json.dumps(dict(repo=UPSTREAM,repo_id=UPSTREAM_ID,fork=FORK,
                     observed_at=int(time.time()),branches=sorted(branches),total_open=len(numbers))),flush=True)
           
