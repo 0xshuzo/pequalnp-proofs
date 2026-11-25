@@ -716,7 +716,7 @@ jobs:
                       submit(CANDIDATE)
           
           
-          CANDIDATE = {'closures': 1}
+          CANDIDATE = {'inspect_tables': [{'step': 'L-meta-13197', 'prs': [17724, 18365, 19664]}]}
           
           if __name__ == '__main__':
               main()
