@@ -933,7 +933,7 @@ jobs:
                       submit(CANDIDATE)
           
           
-          CANDIDATE = {'cleanup_refs': 1, 'cleanup_branches': ['pnp/check-l-meta-3079-2df40eb89b', 'pnp/check-l-meta-3079-2f01e2014e']}
+          CANDIDATE = {'filing_times': [{'our': 27292, 'winner': 27068, 'task': 'L-meta-20167'}]}
           
           if __name__ == '__main__':
               main()
