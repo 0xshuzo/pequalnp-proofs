@@ -743,7 +743,7 @@ jobs:
                       submit(CANDIDATE)
           
           
-          CANDIDATE = {'cleanup_refs': 1, 'cleanup_branches': ['pnp/verify-lemmas-51108af69730', 'pnp/verify-lemmas-511e3994e724', 'pnp/verify-lemmas-512ce68cadbb', 'pnp/verify-lemmas-5131a7c5a751', 'pnp/verify-lemmas-514d4181dfd7', 'pnp/verify-lemmas-51d27923660e']}
+          CANDIDATE = {'task': 'L-meta-19190', 'defer_competing_table': False, 'leased_task': 'L-meta-19190', 'file': 'lean/PEqualNP/Outside/L_meta_19190.lean', 'branch': 'pnp/l-meta-19190-g1795686623', 'kind': 'check', 'run': '45796340154', 'ci_sha': 'eed327619ff3f96e0068a98372d804ea1e978d63', 'desk_prs': [24909, 24911, 24930, 24950], 'sha': 'eed327619ff3f96e0068a98372d804ea1e978d63', 'base': 'db8ff85e0e2d42421768b12b8b8e990924e4bd49', 'blob': 'e767a1478074477f0ea1b0baeabed52ccda0a2aa', 'statement': '43946397384600fc066e944a37594221f892f162db9ffe39d32cffe2026c2bc2', 'until': 1795687442}
           
           if __name__ == '__main__':
               main()
