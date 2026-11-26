@@ -1,0 +1,333 @@
+name: Verify auxiliary Lean lemmas
+on:
+  push:
+    branches: [pnp/verify-lemmas-caba727e8ba6]
+permissions: {}
+jobs:
+  compile:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 32
+    steps:
+      - name: Fetch pinned sources
+        run: |
+          set -eu
+          git init -q .
+          git fetch -q --depth=1 --no-tags https://github.com/0xshuzo/pequalnp-proofs.git "$GITHUB_SHA"
+          git checkout -q --detach FETCH_HEAD
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+      - name: Install Lean and Mathlib
+        working-directory: lean
+        run: |
+          set -eu
+          curl -fsSL https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh | sh -s -- -y --default-toolchain none
+          export PATH="$HOME/.elan/bin:$PATH"
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+          elan toolchain install "$(cat lean-toolchain)"
+          lake exe cache get
+          lake build +PEqualNP.Defs
+      - name: Check Transport23136.lean
+        if: success() || failure()
+        working-directory: lean
+        run: |
+          if test -x /usr/bin/time; then
+            lake env /usr/bin/time -f 'LEAN_RESOURCE Transport23136.lean wall_seconds=%e peak_rss_kib=%M' lean ../diagnostics/Transport23136.lean
+          else
+            lake env lean ../diagnostics/Transport23136.lean
+          fi
+      - name: Check Transport23137.lean
+        if: success() || failure()
+        working-directory: lean
+        run: |
+          if test -x /usr/bin/time; then
+            lake env /usr/bin/time -f 'LEAN_RESOURCE Transport23137.lean wall_seconds=%e peak_rss_kib=%M' lean ../diagnostics/Transport23137.lean
+          else
+            lake env lean ../diagnostics/Transport23137.lean
+          fi
+      - name: Check Transport23138.lean
+        if: success() || failure()
+        working-directory: lean
+        run: |
+          if test -x /usr/bin/time; then
+            lake env /usr/bin/time -f 'LEAN_RESOURCE Transport23138.lean wall_seconds=%e peak_rss_kib=%M' lean ../diagnostics/Transport23138.lean
+          else
+            lake env lean ../diagnostics/Transport23138.lean
+          fi
+      - name: Check Transport23139.lean
+        if: success() || failure()
+        working-directory: lean
+        run: |
+          if test -x /usr/bin/time; then
+            lake env /usr/bin/time -f 'LEAN_RESOURCE Transport23139.lean wall_seconds=%e peak_rss_kib=%M' lean ../diagnostics/Transport23139.lean
+          else
+            lake env lean ../diagnostics/Transport23139.lean
+          fi
+      - name: Check Transport23140.lean
+        if: success() || failure()
+        working-directory: lean
+        run: |
+          if test -x /usr/bin/time; then
+            lake env /usr/bin/time -f 'LEAN_RESOURCE Transport23140.lean wall_seconds=%e peak_rss_kib=%M' lean ../diagnostics/Transport23140.lean
+          else
+            lake env lean ../diagnostics/Transport23140.lean
+          fi
+      - name: Check Transport23141.lean
+        if: success() || failure()
+        working-directory: lean
+        run: |
+          if test -x /usr/bin/time; then
+            lake env /usr/bin/time -f 'LEAN_RESOURCE Transport23141.lean wall_seconds=%e peak_rss_kib=%M' lean ../diagnostics/Transport23141.lean
+          else
+            lake env lean ../diagnostics/Transport23141.lean
+          fi
+      - name: Check Transport23143.lean
+        if: success() || failure()
+        working-directory: lean
+        run: |
+          if test -x /usr/bin/time; then
+            lake env /usr/bin/time -f 'LEAN_RESOURCE Transport23143.lean wall_seconds=%e peak_rss_kib=%M' lean ../diagnostics/Transport23143.lean
+          else
+            lake env lean ../diagnostics/Transport23143.lean
+          fi
+      - name: Check Transport23144.lean
+        if: success() || failure()
+        working-directory: lean
+        run: |
+          if test -x /usr/bin/time; then
+            lake env /usr/bin/time -f 'LEAN_RESOURCE Transport23144.lean wall_seconds=%e peak_rss_kib=%M' lean ../diagnostics/Transport23144.lean
+          else
+            lake env lean ../diagnostics/Transport23144.lean
+          fi
+      - name: Check Transport23146.lean
+        if: success() || failure()
+        working-directory: lean
+        run: |
+          if test -x /usr/bin/time; then
+            lake env /usr/bin/time -f 'LEAN_RESOURCE Transport23146.lean wall_seconds=%e peak_rss_kib=%M' lean ../diagnostics/Transport23146.lean
+          else
+            lake env lean ../diagnostics/Transport23146.lean
+          fi
+      - name: Check Transport23147.lean
+        if: success() || failure()
+        working-directory: lean
+        run: |
+          if test -x /usr/bin/time; then
+            lake env /usr/bin/time -f 'LEAN_RESOURCE Transport23147.lean wall_seconds=%e peak_rss_kib=%M' lean ../diagnostics/Transport23147.lean
+          else
+            lake env lean ../diagnostics/Transport23147.lean
+          fi
+      - name: Check Transport23148.lean
+        if: success() || failure()
+        working-directory: lean
+        run: |
+          if test -x /usr/bin/time; then
+            lake env /usr/bin/time -f 'LEAN_RESOURCE Transport23148.lean wall_seconds=%e peak_rss_kib=%M' lean ../diagnostics/Transport23148.lean
+          else
+            lake env lean ../diagnostics/Transport23148.lean
+          fi
+      - name: Check Transport23152.lean
+        if: success() || failure()
+        working-directory: lean
+        run: |
+          if test -x /usr/bin/time; then
+            lake env /usr/bin/time -f 'LEAN_RESOURCE Transport23152.lean wall_seconds=%e peak_rss_kib=%M' lean ../diagnostics/Transport23152.lean
+          else
+            lake env lean ../diagnostics/Transport23152.lean
+          fi
+      - name: Check Transport23154.lean
+        if: success() || failure()
+        working-directory: lean
+        run: |
+          if test -x /usr/bin/time; then
+            lake env /usr/bin/time -f 'LEAN_RESOURCE Transport23154.lean wall_seconds=%e peak_rss_kib=%M' lean ../diagnostics/Transport23154.lean
+          else
+            lake env lean ../diagnostics/Transport23154.lean
+          fi
+      - name: Check Transport23158.lean
+        if: success() || failure()
+        working-directory: lean
+        run: |
+          if test -x /usr/bin/time; then
+            lake env /usr/bin/time -f 'LEAN_RESOURCE Transport23158.lean wall_seconds=%e peak_rss_kib=%M' lean ../diagnostics/Transport23158.lean
+          else
+            lake env lean ../diagnostics/Transport23158.lean
+          fi
+      - name: Check Transport23162.lean
+        if: success() || failure()
+        working-directory: lean
+        run: |
+          if test -x /usr/bin/time; then
+            lake env /usr/bin/time -f 'LEAN_RESOURCE Transport23162.lean wall_seconds=%e peak_rss_kib=%M' lean ../diagnostics/Transport23162.lean
+          else
+            lake env lean ../diagnostics/Transport23162.lean
+          fi
+      - name: Check Transport23163.lean
+        if: success() || failure()
+        working-directory: lean
+        run: |
+          if test -x /usr/bin/time; then
+            lake env /usr/bin/time -f 'LEAN_RESOURCE Transport23163.lean wall_seconds=%e peak_rss_kib=%M' lean ../diagnostics/Transport23163.lean
+          else
+            lake env lean ../diagnostics/Transport23163.lean
+          fi
+      - name: Check Transport23164.lean
+        if: success() || failure()
+        working-directory: lean
+        run: |
+          if test -x /usr/bin/time; then
+            lake env /usr/bin/time -f 'LEAN_RESOURCE Transport23164.lean wall_seconds=%e peak_rss_kib=%M' lean ../diagnostics/Transport23164.lean
+          else
+            lake env lean ../diagnostics/Transport23164.lean
+          fi
+      - name: Check Transport23165.lean
+        if: success() || failure()
+        working-directory: lean
+        run: |
+          if test -x /usr/bin/time; then
+            lake env /usr/bin/time -f 'LEAN_RESOURCE Transport23165.lean wall_seconds=%e peak_rss_kib=%M' lean ../diagnostics/Transport23165.lean
+          else
+            lake env lean ../diagnostics/Transport23165.lean
+          fi
+      - name: Check Transport23166.lean
+        if: success() || failure()
+        working-directory: lean
+        run: |
+          if test -x /usr/bin/time; then
+            lake env /usr/bin/time -f 'LEAN_RESOURCE Transport23166.lean wall_seconds=%e peak_rss_kib=%M' lean ../diagnostics/Transport23166.lean
+          else
+            lake env lean ../diagnostics/Transport23166.lean
+          fi
+      - name: Check Transport23167.lean
+        if: success() || failure()
+        working-directory: lean
+        run: |
+          if test -x /usr/bin/time; then
+            lake env /usr/bin/time -f 'LEAN_RESOURCE Transport23167.lean wall_seconds=%e peak_rss_kib=%M' lean ../diagnostics/Transport23167.lean
+          else
+            lake env lean ../diagnostics/Transport23167.lean
+          fi
+      - name: Check Transport23168.lean
+        if: success() || failure()
+        working-directory: lean
+        run: |
+          if test -x /usr/bin/time; then
+            lake env /usr/bin/time -f 'LEAN_RESOURCE Transport23168.lean wall_seconds=%e peak_rss_kib=%M' lean ../diagnostics/Transport23168.lean
+          else
+            lake env lean ../diagnostics/Transport23168.lean
+          fi
+      - name: Check Transport23169.lean
+        if: success() || failure()
+        working-directory: lean
+        run: |
+          if test -x /usr/bin/time; then
+            lake env /usr/bin/time -f 'LEAN_RESOURCE Transport23169.lean wall_seconds=%e peak_rss_kib=%M' lean ../diagnostics/Transport23169.lean
+          else
+            lake env lean ../diagnostics/Transport23169.lean
+          fi
+      - name: Check Transport23573.lean
+        if: success() || failure()
+        working-directory: lean
+        run: |
+          if test -x /usr/bin/time; then
+            lake env /usr/bin/time -f 'LEAN_RESOURCE Transport23573.lean wall_seconds=%e peak_rss_kib=%M' lean ../diagnostics/Transport23573.lean
+          else
+            lake env lean ../diagnostics/Transport23573.lean
+          fi
+      - name: Check Transport23574.lean
+        if: success() || failure()
+        working-directory: lean
+        run: |
+          if test -x /usr/bin/time; then
+            lake env /usr/bin/time -f 'LEAN_RESOURCE Transport23574.lean wall_seconds=%e peak_rss_kib=%M' lean ../diagnostics/Transport23574.lean
+          else
+            lake env lean ../diagnostics/Transport23574.lean
+          fi
+      - name: Check Transport23575.lean
+        if: success() || failure()
+        working-directory: lean
+        run: |
+          if test -x /usr/bin/time; then
+            lake env /usr/bin/time -f 'LEAN_RESOURCE Transport23575.lean wall_seconds=%e peak_rss_kib=%M' lean ../diagnostics/Transport23575.lean
+          else
+            lake env lean ../diagnostics/Transport23575.lean
+          fi
+      - name: Check Transport23577.lean
+        if: success() || failure()
+        working-directory: lean
+        run: |
+          if test -x /usr/bin/time; then
+            lake env /usr/bin/time -f 'LEAN_RESOURCE Transport23577.lean wall_seconds=%e peak_rss_kib=%M' lean ../diagnostics/Transport23577.lean
+          else
+            lake env lean ../diagnostics/Transport23577.lean
+          fi
+      - name: Check Transport23604.lean
+        if: success() || failure()
+        working-directory: lean
+        run: |
+          if test -x /usr/bin/time; then
+            lake env /usr/bin/time -f 'LEAN_RESOURCE Transport23604.lean wall_seconds=%e peak_rss_kib=%M' lean ../diagnostics/Transport23604.lean
+          else
+            lake env lean ../diagnostics/Transport23604.lean
+          fi
+      - name: Check Transport23605.lean
+        if: success() || failure()
+        working-directory: lean
+        run: |
+          if test -x /usr/bin/time; then
+            lake env /usr/bin/time -f 'LEAN_RESOURCE Transport23605.lean wall_seconds=%e peak_rss_kib=%M' lean ../diagnostics/Transport23605.lean
+          else
+            lake env lean ../diagnostics/Transport23605.lean
+          fi
+      - name: Check Transport23627.lean
+        if: success() || failure()
+        working-directory: lean
+        run: |
+          if test -x /usr/bin/time; then
+            lake env /usr/bin/time -f 'LEAN_RESOURCE Transport23627.lean wall_seconds=%e peak_rss_kib=%M' lean ../diagnostics/Transport23627.lean
+          else
+            lake env lean ../diagnostics/Transport23627.lean
+          fi
+      - name: Check Transport23628.lean
+        if: success() || failure()
+        working-directory: lean
+        run: |
+          if test -x /usr/bin/time; then
+            lake env /usr/bin/time -f 'LEAN_RESOURCE Transport23628.lean wall_seconds=%e peak_rss_kib=%M' lean ../diagnostics/Transport23628.lean
+          else
+            lake env lean ../diagnostics/Transport23628.lean
+          fi
+      - name: Check Transport23639.lean
+        if: success() || failure()
+        working-directory: lean
+        run: |
+          if test -x /usr/bin/time; then
+            lake env /usr/bin/time -f 'LEAN_RESOURCE Transport23639.lean wall_seconds=%e peak_rss_kib=%M' lean ../diagnostics/Transport23639.lean
+          else
+            lake env lean ../diagnostics/Transport23639.lean
+          fi
+      - name: Check Transport23642.lean
+        if: success() || failure()
+        working-directory: lean
+        run: |
+          if test -x /usr/bin/time; then
+            lake env /usr/bin/time -f 'LEAN_RESOURCE Transport23642.lean wall_seconds=%e peak_rss_kib=%M' lean ../diagnostics/Transport23642.lean
+          else
+            lake env lean ../diagnostics/Transport23642.lean
+          fi
+      - name: Check Transport23662.lean
+        if: success() || failure()
+        working-directory: lean
+        run: |
+          if test -x /usr/bin/time; then
+            lake env /usr/bin/time -f 'LEAN_RESOURCE Transport23662.lean wall_seconds=%e peak_rss_kib=%M' lean ../diagnostics/Transport23662.lean
+          else
+            lake env lean ../diagnostics/Transport23662.lean
+          fi
+      - name: Check Transport23684.lean
+        if: success() || failure()
+        working-directory: lean
+        run: |
+          if test -x /usr/bin/time; then
+            lake env /usr/bin/time -f 'LEAN_RESOURCE Transport23684.lean wall_seconds=%e peak_rss_kib=%M' lean ../diagnostics/Transport23684.lean
+          else
+            lake env lean ../diagnostics/Transport23684.lean
+          fi
