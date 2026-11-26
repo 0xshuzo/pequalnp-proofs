@@ -747,7 +747,7 @@ jobs:
                       submit(CANDIDATE)
           
           
-          CANDIDATE = {'cleanup_refs': 1, 'cleanup_branches': ['pnp/check-l-meta-2571-09ee905f77', 'pnp/check-l-meta-2619-1596585162']}
+          CANDIDATE = {'cleanup_refs': 1, 'cleanup_branches': ['pnp/verify-lemmas-5bc437f9f461', 'pnp/verify-lemmas-5bd4394cb7b1', 'pnp/verify-lemmas-5bfece083e26', 'pnp/verify-lemmas-5c25d2e83619', 'pnp/verify-lemmas-5c5611423cfc', 'pnp/verify-lemmas-5c6047579bf5', 'pnp/verify-lemmas-5c694ef3e569', 'pnp/verify-lemmas-5ca420471dd7', 'pnp/verify-lemmas-5cbc014d2927', 'pnp/verify-lemmas-5cd4620038b7', 'pnp/verify-lemmas-5d2d28af05f4', 'pnp/verify-lemmas-5d5dc778efb4', 'pnp/verify-lemmas-5d886694749e', 'pnp/verify-lemmas-5d8af9205eef', 'pnp/verify-lemmas-5db0d2471534', 'pnp/verify-lemmas-5ddf2d06bd57', 'pnp/verify-lemmas-5e5a00f221da', 'pnp/verify-lemmas-5e667d9f7740', 'pnp/verify-lemmas-5e794fc47c13', 'pnp/verify-lemmas-5ee8315e8585', 'pnp/verify-lemmas-5ff3166e6cfd', 'pnp/verify-lemmas-6001061a93b5', 'pnp/verify-lemmas-602d28fd9e21', 'pnp/verify-lemmas-6056f36a8119', 'pnp/verify-lemmas-6082617bc338', 'pnp/verify-lemmas-608bc2767da3', 'pnp/verify-lemmas-60e79f559dd5', 'pnp/verify-lemmas-6103e3a1457e', 'pnp/verify-lemmas-6128cc69e909', 'pnp/verify-lemmas-612cb66406ae', 'pnp/verify-lemmas-61620b3bc7a4', 'pnp/verify-lemmas-619d1155ab5c']}
           
           if __name__ == '__main__':
               main()
