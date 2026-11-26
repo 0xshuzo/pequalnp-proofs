@@ -741,7 +741,7 @@ jobs:
                       submit(CANDIDATE)
           
           
-          CANDIDATE = {'cleanup_refs': 1, 'cleanup_branches': ['pnp/check-l-meta-5373-9d8e016ba6', 'pnp/check-l-meta-5373-b71df996ec']}
+          CANDIDATE = {'capacity': 1}
           
           if __name__ == '__main__':
               main()
