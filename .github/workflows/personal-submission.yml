@@ -741,7 +741,7 @@ jobs:
                       submit(CANDIDATE)
           
           
-          CANDIDATE = {'capacity': 1}
+          CANDIDATE = {'task': 'L-meta-9298', 'defer_competing_table': False, 'leased_task': 'L-meta-9298', 'file': 'lean/PEqualNP/Outside/L_meta_9298.lean', 'branch': 'pnp/l-meta-9298-resume', 'kind': 'check', 'run': '45773471666', 'ci_sha': '0482c67308a7455197e153bd11f5fd4dac81c158', 'desk_prs': [13353], 'sha': '0482c67308a7455197e153bd11f5fd4dac81c158', 'base': '33f667422a2deebb87e9826f0bc326286b03df5f', 'blob': '51d1185a0208c9464d1a1f2b8dc756496b12e2ea', 'statement': '4a27fd229f574f9261e840903d7ba8db6a6b7d74964211064de0bca8bc40d4d0', 'until': 1795677667}
           
           if __name__ == '__main__':
               main()
