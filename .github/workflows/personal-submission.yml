@@ -615,6 +615,29 @@ jobs:
               print('CLOSED_TOTAL',len(rows),flush=True)
           
           
+          def filing_times(pairs):
+              require(0 < len(pairs) <= 500, 'Unexpected number of proof pairs')
+              fields = 'number createdAt mergedAt state author{login} files(first:2){totalCount nodes{path}}'
+              for start in range(0, len(pairs), 30):
+                  group = pairs[start:start+30]
+                  numbers = {number for entry in group for number in (entry['our'], entry['winner'])}
+                  require(all(type(n) is int and n > 0 for n in numbers), 'Invalid PR number')
+                  lookups = ' '.join(f'p{n}:pullRequest(number:{n}){{{fields}}}' for n in sorted(numbers))
+                  query = '{repository(owner:"open-goat",name:"pequalnp-proofs"){databaseId '+lookups+'}}'
+                  repo = json.loads(gh('api','--hostname','github.com','graphql','-f','query='+query).stdout)['data']['repository']
+                  require(repo['databaseId']==UPSTREAM_ID,'Unexpected upstream repository')
+                  for entry in group:
+                      task = entry['task']
+                      require(re.fullmatch(r'L-[a-z]+-\d+', task), 'Unexpected proof step')
+                      ours, winner = (repo['p'+str(entry[k])] for k in ('our','winner'))
+                      require(ours['state']=='CLOSED' and ours['author']['login']=='0xshuzo' and winner['state']=='MERGED', 'Unexpected PR outcome')
+                      path = 'lean/PEqualNP/Outside/'+task.replace('-','_')+'.lean'
+                      for pr in (ours,winner):
+                          require(pr['files']=={'totalCount':1,'nodes':[{'path':path}]}, 'Winning proof path differs')
+                      print('FILING_TIMES',json.dumps({'task':task,'our':ours['number'],'winner':winner['number'],
+                            'ours_opened':ours['createdAt'],'winner_opened':winner['createdAt'],'winner_merged':winner['mergedAt']}),flush=True)
+          
+          
           def fork_refs_in_upstream_prs(branches_to_check=()):
               if branches_to_check:
                   require(len(branches_to_check)<=50 and len(set(branches_to_check))==len(branches_to_check) and
@@ -708,6 +731,8 @@ jobs:
                           foreign_standard_prs(query, related)
                   elif 'capacity' in CANDIDATE:
                       reduction_capacity()
+                  elif 'filing_times' in CANDIDATE:
+                      filing_times(CANDIDATE['filing_times'])
                   elif 'closures' in CANDIDATE:
                       closure_inventory()
                   elif 'audit' in CANDIDATE:
@@ -716,7 +741,7 @@ jobs:
                       submit(CANDIDATE)
           
           
-          CANDIDATE = {'closures': 1}
+          CANDIDATE = {'filing_times': [{'our': 6692, 'winner': 6296, 'task': 'L-meta-3322'}, {'our': 7271, 'winner': 6261, 'task': 'L-meta-3120'}, {'our': 9120, 'winner': 8907, 'task': 'L-meta-4610'}, {'our': 9476, 'winner': 6114, 'task': 'L-meta-2309'}, {'our': 12017, 'winner': 11894, 'task': 'L-meta-6032'}, {'our': 12203, 'winner': 13177, 'task': 'L-meta-670'}, {'our': 13398, 'winner': 13368, 'task': 'L-meta-9409'}, {'our': 14696, 'winner': 14521, 'task': 'L-meta-10992'}, {'our': 14770, 'winner': 14062, 'task': 'L-meta-9506'}, {'our': 14821, 'winner': 14660, 'task': 'L-meta-10494'}, {'our': 14845, 'winner': 13990, 'task': 'L-meta-10129'}, {'our': 14850, 'winner': 14564, 'task': 'L-meta-10640'}, {'our': 14979, 'winner': 14781, 'task': 'L-meta-10918'}, {'our': 15436, 'winner': 15465, 'task': 'L-meta-11659'}, {'our': 15730, 'winner': 15441, 'task': 'L-meta-11475'}, {'our': 15809, 'winner': 15737, 'task': 'L-meta-11677'}, {'our': 15833, 'winner': 15491, 'task': 'L-meta-11619'}, {'our': 15880, 'winner': 15797, 'task': 'L-meta-11090'}, {'our': 15885, 'winner': 15794, 'task': 'L-meta-10744'}, {'our': 15959, 'winner': 15445, 'task': 'L-meta-10596'}, {'our': 16105, 'winner': 16111, 'task': 'L-meta-12072'}, {'our': 16197, 'winner': 15574, 'task': 'L-pcx-160'}, {'our': 16438, 'winner': 16200, 'task': 'L-meta-12212'}, {'our': 16444, 'winner': 16115, 'task': 'L-meta-12188'}, {'our': 16477, 'winner': 16228, 'task': 'L-meta-12124'}, {'our': 16499, 'winner': 16254, 'task': 'L-meta-12288'}, {'our': 16686, 'winner': 16716, 'task': 'L-meta-12144'}, {'our': 16709, 'winner': 16615, 'task': 'L-meta-12575'}, {'our': 16966, 'winner': 16337, 'task': 'L-meta-12068'}, {'our': 16975, 'winner': 16359, 'task': 'L-meta-12268'}, {'our': 17140, 'winner': 16160, 'task': 'L-meta-12218'}, {'our': 17200, 'winner': 16725, 'task': 'L-meta-12495'}, {'our': 17213, 'winner': 16218, 'task': 'L-meta-12038'}, {'our': 17401, 'winner': 16272, 'task': 'L-meta-12286'}, {'our': 17486, 'winner': 17123, 'task': 'L-meta-12913'}, {'our': 17829, 'winner': 16456, 'task': 'L-meta-12088'}, {'our': 17926, 'winner': 17618, 'task': 'L-meta-13465'}, {'our': 18132, 'winner': 17924, 'task': 'L-meta-13943'}, {'our': 18163, 'winner': 17703, 'task': 'L-meta-13307'}, {'our': 18279, 'winner': 17755, 'task': 'L-meta-14011'}, {'our': 18779, 'winner': 18659, 'task': 'L-meta-14084'}, {'our': 19025, 'winner': 19051, 'task': 'L-meta-14514'}, {'our': 19467, 'winner': 18964, 'task': 'L-meta-14242'}, {'our': 19477, 'winner': 19040, 'task': 'L-meta-15074'}]}
           
           if __name__ == '__main__':
               main()
