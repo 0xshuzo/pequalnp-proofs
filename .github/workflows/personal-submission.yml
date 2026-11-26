@@ -1166,7 +1166,7 @@ jobs:
                       submit(CANDIDATE)
           
           
-          CANDIDATE = {'closures': 1}
+          CANDIDATE = {'filing_times': [{'our': 36826, 'winner': 34975, 'task': 'L-meta-24586'}, {'our': 36837, 'winner': 33750, 'task': 'L-meta-24024'}]}
           
           if __name__ == '__main__':
               main()
