@@ -903,12 +903,167 @@ jobs:
                             'ours_opened':ours['createdAt'],'winner_opened':winner['createdAt'],'winner_merged':winner['mergedAt']}),flush=True)
           
           
+          def advertised_standard_heads(repository, wanted, profile):
+              """Read the public Git head refs. Only candidate OIDs and their ref names leave this function."""
+              require(repository in (UPSTREAM,FORK), 'Unexpected Git advertisement repository')
+              pattern = 'refs/pull/*/head' if repository == UPSTREAM else 'refs/heads/*'
+              args = ['/usr/bin/git','-c','credential.helper=',
+                      '-c','credential.https://github.com.helper=!/usr/bin/gh auth git-credential',
+                      '-c','http.followRedirects=false','ls-remote','--refs',
+                      '--exit-code','https://github.com/'+repository+'.git',pattern,'refs/heads/main']
+              env = dict(PATH=os.defpath, LC_ALL='C', GIT_TERMINAL_PROMPT='0', GIT_ALLOW_PROTOCOL='https',
+                         GIT_CONFIG_NOSYSTEM='1', GIT_CONFIG_GLOBAL=os.devnull, HOME=profile, GH_CONFIG_DIR=profile,
+                         GH_HOST='github.com', GH_PROMPT_DISABLED='1', GH_NO_UPDATE_NOTIFIER='1')
+              with tempfile.TemporaryDirectory() as cwd, tempfile.TemporaryFile() as out:
+                  env['GIT_CEILING_DIRECTORIES']=os.path.dirname(cwd)
+                  subprocess.run(args,cwd=cwd,env=env,stdin=subprocess.DEVNULL,stdout=out,stderr=subprocess.DEVNULL,
+                                 check=True,timeout=45)
+                  require(0 < out.tell() <= 24*1024*1024,'Git ref advertisement outside review bound')
+                  out.seek(0)
+                  return parse_standard_advertisement(repository, out, wanted)
+          
+          
+          def parse_standard_advertisement(repository, lines, wanted):
+              matches = {oid:set() for oid in wanted}
+              seen = set()
+              for line in lines:
+                  oid, sep, name = line.rstrip(b'\n').partition(b'\t')
+                  require(sep and re.fullmatch(b'[a-f0-9]{40}',oid) and name not in seen, 'Invalid or repeated Git ref')
+                  seen.add(name)
+                  oid = oid.decode('ascii')
+                  if name == b'refs/heads/main' and repository == UPSTREAM:
+                      continue
+                  if repository == UPSTREAM:
+                      m = re.fullmatch(rb'refs/pull/([1-9][0-9]{0,9})/head', name)
+                      require(m,'Malformed upstream PR head advertisement')
+                      if oid in matches:
+                          matches[oid].add(int(m[1]))
+                  else:
+                      require(name.startswith(b'refs/heads/') and len(name)>11,'Malformed fork head advertisement')
+                      if oid in matches:
+                          matches[oid].add(name[11:].decode('utf-8'))
+              require(b'refs/heads/main' in seen and (repository != UPSTREAM or len(seen)>1),
+                      'Expected public Git head namespace unavailable')
+              return matches, seen
+          
+          
+          def standard_head_observation(wanted, profile):
+              """Check exact names, every advertised same-SHA fork alias and every matching upstream PR number."""
+              oids = set(wanted.values())
+              numbered, upstream_refs = advertised_standard_heads(UPSTREAM,oids,profile)
+              aliases, _ = advertised_standard_heads(FORK,oids,profile)
+              held = set()
+              names = {branch:{branch} for branch in wanted}
+              numbers = {}
+              for oid in oids:
+                  candidates = {branch for branch,head in wanted.items() if head==oid}
+                  if len(aliases[oid])+len(numbered[oid])>12:
+                      # An unusually shared OID stays protected; no unbounded query fan-out.
+                      held.update(candidates)
+                      continue
+                  for alias in aliases[oid]:
+                      names.setdefault(alias,set()).update(candidates)
+                  for number in numbered[oid]:
+                      numbers[number] = oid
+              fields = 'number state headRefName headRefOid headRepository{nameWithOwner}'
+              queries = []
+              names = sorted(names.items())
+              for i,(name,_) in enumerate(names):
+                  queries.append(f'b{i}:pullRequests(states:OPEN,headRefName:{json.dumps(name)},first:8)'
+                                 '{pageInfo{hasNextPage} nodes{'+fields+'}}')
+              for number in sorted(numbers):
+                  queries.append(f'p{number}:pullRequest(number:{number})'+'{'+fields+'}')
+              query = ('{repository(owner:"open-goat",name:"pequalnp-proofs"){databaseId defaultBranchRef{name target{oid}} '
+                       'sample:pullRequests(states:OPEN,first:2,orderBy:{field:CREATED_AT,direction:ASC}){totalCount nodes{number}} '
+                       +' '.join(queries)+'}}')
+              answer = json.loads(gh('api','--hostname','github.com','graphql','-f','query='+query).stdout)
+              require(not answer.get('errors'), 'Partial standard-base GraphQL response')
+              repo = answer['data']['repository']
+              main, sample = repo['defaultBranchRef'], repo['sample']
+              require(repo['databaseId']==UPSTREAM_ID and main['name']=='main' and re.fullmatch('[a-f0-9]{40}',main['target']['oid']),
+                      'Unexpected upstream repository or main commit')
+              require(type(sample['totalCount']) is int and sample['totalCount']>=0 and
+                      len(sample['nodes'])==min(2,sample['totalCount']) and all(
+                      ('refs/pull/'+str(p['number'])+'/head').encode() in upstream_refs for p in sample['nodes']),
+                      'Open upstream PRs missing from Git head namespace')
+          
+              def inspect(row):
+                  require(type(row['number']) is int and row['number']>0 and isinstance(row['headRefName'],str)
+                          and re.fullmatch('[a-f0-9]{40}',row['headRefOid']), 'Invalid exact upstream PR response')
+                  owner = None if row['headRepository'] is None else row['headRepository']['nameWithOwner']
+                  require(owner is None or isinstance(owner,str) and owner, 'Invalid upstream head repository')
+                  if row['state']=='OPEN':
+                      held.update(n for n,h in wanted.items() if h==row['headRefOid'])
+                  return owner
+          
+              for i,(name,dependent) in enumerate(names):
+                  page = repo['b'+str(i)]
+                  more = page['pageInfo']['hasNextPage']
+                  nodes = page['nodes']
+                  require(type(more) is bool and len(nodes)<=8 and
+                          len({p['number'] for p in nodes})==len(nodes), 'Invalid exact head-name connection')
+                  if more:
+                      held.update(dependent)
+                  for p in nodes:
+                      require(p['headRefName']==name and p['state']=='OPEN','Unexpected exact head-name filter result')
+                      if inspect(p) in (None,FORK):
+                          held.update(dependent)
+              for number,oid in numbers.items():
+                  p=repo['p'+str(number)]
+                  require(p and p['number']==number and p['state'] in ('OPEN','CLOSED','MERGED'),
+                          'Advertised upstream PR unavailable')
+                  inspect(p)
+                  if p['state']=='OPEN':
+                      # Retain the advertised candidate even when GraphQL and Git momentarily see different tips.
+                      held.update(n for n,h in wanted.items() if h==oid)
+              return held, main['target']['oid'], sample['totalCount'], {h:(aliases[h],numbered[h]) for h in oids}
+          
+          
+          def standard_protection(wanted):
+              started=int(time.time())
+              # main() has verified this account/token pair. Git receives a private profile,
+              # never the process environment, a token override, or a credential in its argv.
+              with tempfile.TemporaryDirectory(dir=gh_env['GH_CONFIG_DIR']) as profile:
+                  hosts=os.path.join(profile,'hosts.yml')
+                  with os.fdopen(os.open(hosts,os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600),'w') as out:
+                      # JSON is valid YAML; keep the already verified active host login for gh.
+                      json.dump({'github.com':dict(user='0xshuzo',oauth_token=gh_env['GH_TOKEN'],git_protocol='https')},out)
+                  previous, _, _, before = standard_head_observation(wanted,profile)
+                  final, main, total, after = standard_head_observation(wanted,profile)
+              held = previous | final | {n for n,h in wanted.items() if before[h]!=after[h]}
+              # GitHub's owner-qualified REST filter independently confirms actual fork PR sources,
+              # including other fork ref names observed at the same SHA. Never clear an unqueried alias.
+              endpoints = {}
+              for name, oid in wanted.items():
+                  if name not in held:
+                      for alias in {name} | after[oid][0]:
+                          endpoints.setdefault(alias,set()).add(name)
+              for i,(alias,dependents) in enumerate(sorted(endpoints.items(),key=lambda pair:(pair[0] not in wanted,pair[0]))):
+                  if i>=32:
+                      held.update(dependents)
+                      continue
+                  require(0<=time.time()-started<=300, 'Standard base observations expired')
+                  path=UPSTREAM_API+'pulls?'+urlencode(dict(state='open',head='0xshuzo:'+alias,per_page=1))
+                  found=api(path)
+                  require(isinstance(found,list) and len(found)<=1 and all(p['state']=='open' and
+                          p['base']['repo']['id']==UPSTREAM_ID and p['head']['ref']==alias and
+                          (p['head']['repo'] is None or p['head']['repo']['full_name']==FORK) for p in found),
+                          'Invalid owner-qualified upstream PR lookup')
+                  if found:
+                      held.update(dependents)
+              require(0<=time.time()-started<=300, 'Standard base observations expired')
+              print('UPSTREAM_FORK_REFS',json.dumps(dict(repo=UPSTREAM,repo_id=UPSTREAM_ID,fork=FORK,
+                    observed_at=started,branches=sorted(held),coverage_heads=wanted,upstream_main=main,total_open=total,
+                    coverage_method='public_git_heads_and_personal_pr_queries',owner_ref_queries=min(32,len(endpoints)))),flush=True)
+          
+          
           def fork_refs_in_upstream_prs(branches_to_check=(), standard_heads=None):
               if standard_heads is not None:
                   require(not branches_to_check and isinstance(standard_heads, dict) and 1 <= len(standard_heads) <= 12
                           and all(re.fullmatch(r'pnp-base-[a-f0-9]{12}|pnp-advisory-[a-f0-9]{12}-(?:own-pr|desk12m)', ref)
                                   and re.fullmatch('[a-f0-9]{40}', sha) for ref, sha in standard_heads.items()),
                           'Invalid standard base coverage')
+                  return standard_protection(standard_heads)
               if branches_to_check:
                   require(len(branches_to_check)<=50 and len(set(branches_to_check))==len(branches_to_check) and
                           all(re.fullmatch(r'pnp/(?:verify-lemmas-[0-9a-f]{12}|check-l-[a-z]+-[0-9]+-[0-9a-f]{10})',b)
@@ -935,15 +1090,9 @@ jobs:
                   }
                 }
               }'''
-              if standard_heads is not None:
-                  query = query.replace('databaseId pullRequests', 'databaseId defaultBranchRef{name target{oid}} pullRequests')
-                  query = query.replace('headRefName headRepository', 'headRefName headRefOid headRepository')
               for _ in range(3):
-                  started = int(time.time())
                   response = gh('api','--hostname','github.com','graphql','--paginate','--slurp','-f','query='+query)
                   branches = set()
-                  mains = set()
-                  count = 0
                   numbers = set()
                   totals = []
                   pages = json.loads(response.stdout)
@@ -951,33 +1100,19 @@ jobs:
                   for page in pages:
                       repo = page['data']['repository']
                       require(repo['databaseId']==UPSTREAM_ID,'Unexpected cleanup inventory repository')
-                      if standard_heads is not None:
-                          main = repo['defaultBranchRef']
-                          require(main['name']=='main' and re.fullmatch('[a-f0-9]{40}', main['target']['oid']),
-                                  'Unverified upstream main')
-                          mains.add(main['target']['oid'])
                       prs = repo['pullRequests']
                       totals.append(prs['totalCount'])
                       for row in prs['nodes']:
                           numbers.add(row['number'])
-                          count += 1
-                          if standard_heads is not None:
-                              require(type(row['number']) is int and isinstance(row['headRefName'],str)
-                                      and re.fullmatch('[a-f0-9]{40}',row['headRefOid']), 'Invalid upstream PR endpoint')
-                              owner = (row['headRepository'] or {}).get('nameWithOwner')
-                              branches.update(ref for ref, oid in standard_heads.items()
-                                              if row['headRefOid'] == oid or (owner in (FORK,None) and row['headRefName']==ref))
-                          elif (row['headRepository'] or {}).get('nameWithOwner')==FORK:
+                          if (row['headRepository'] or {}).get('nameWithOwner')==FORK:
                               branches.add(row['headRefName'])
                   require(not prs['pageInfo']['hasNextPage'], 'Incomplete upstream branch inventory')
-                  if len(numbers)==totals[-1] and len(set(totals))==1 and (
-                          standard_heads is None or len(mains)==1 and count==len(numbers)):
+                  if len(numbers)==totals[-1] and len(set(totals))==1:
                       break
               else:
                   raise SystemExit('Open upstream PR inventory changed during three complete reads')
               print('UPSTREAM_FORK_REFS',json.dumps(dict(repo=UPSTREAM,repo_id=UPSTREAM_ID,fork=FORK,
-                    observed_at=(started if standard_heads is not None else int(time.time())),branches=sorted(branches),total_open=len(numbers),
-                    **({'coverage_heads':standard_heads,'upstream_main':mains.pop()} if standard_heads is not None else {}))),flush=True)
+                    observed_at=int(time.time()),branches=sorted(branches),total_open=len(numbers))),flush=True)
           
           
           def main():
@@ -1031,7 +1166,7 @@ jobs:
                       submit(CANDIDATE)
           
           
-          CANDIDATE = {'cleanup_refs': 1, 'cleanup_branches': ['pnp/check-l-meta-3853-12724180f6', 'pnp/check-l-meta-3853-503da0e570']}
+          CANDIDATE = {'cleanup_refs': 1, 'standard_heads': {'pnp-advisory-0e23f85764b6-own-pr': '4dd53fa2d03243a955911dea27f91890837fab01', 'pnp-advisory-22282e8b43a6-own-pr': 'a41a7e1682c7d299537315932a54edcf3a6fd3a1'}}
           
           if __name__ == '__main__':
               main()
