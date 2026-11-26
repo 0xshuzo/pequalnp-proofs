@@ -545,6 +545,9 @@ jobs:
               merge merged closed reopened open pull request branch base head commit changed stale rebase
               conflict file files path content size limit imports missing invalid unsupported reduction
               capacity timeout permission build repository update maintainer scheduled running superseded
+              time memory resource runtime process wall clock cpu heartbeat heartbeats recursion depth
+              minutes seconds exceeded exceed reached ran timed out unable finish retrying rerun smaller
+              split simplify complexity kernel elaboration file size bytes killed budget infrastructure
           """.split())
           
           
