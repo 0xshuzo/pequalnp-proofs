@@ -536,6 +536,29 @@ jobs:
                   require(confirm(c, rows), 'No confirmed upstream PR for the verified head')
           
           
+          # Only these fixed terms can leave an otherwise unrecognized intake-bot comment.
+          FEEDBACK_TERMS = frozenset("""
+              proof proved lemma gap step statement posted desk lease leased expired released reserved
+              assigned claimed available unavailable active already another earlier first competing duplicate
+              checker check checked advisory authoritative verdict accepted rejected refused fault failed blocked
+              cannot not never pending waiting queued queue review retry resubmit submitted recorded
+              merge merged closed reopened open pull request branch base head commit changed stale rebase
+              conflict file files path content size limit imports missing invalid unsupported reduction
+              capacity timeout permission build repository update maintainer scheduled running superseded
+          """.split())
+          
+          
+          def unknown_feedback_terms(body):
+              # Suppress code, URLs, markup targets and credential fields before examining prose.
+              prose = re.sub(r'```[\s\S]*?(?:```|$)|`[^`\n]*(?:`|$)|https?://\S+|\]\([^)]*\)',
+                             ' ', body, flags=re.I)
+              prose = re.sub(r'(?im)\b(?:authorization|bearer|password|secret|credential|token|api[ _-]?key)'
+                             r'\b[^\n]*', ' ', prose)
+              # Do not pull words out of paths, email addresses, identifiers or encoded strings.
+              words = re.findall(r"(?<![\w@/#=+.%?-])[a-z]+(?![\w@/#=+%?-]|[.][\w/])", prose.lower())
+              return list(dict.fromkeys(word for word in words if word in FEEDBACK_TERMS))[:20]
+          
+          
           def project_comment(comment, head):
               """Return only fixed project outcomes and public comment identifiers."""
               user = comment.get('user') or {}
@@ -567,6 +590,10 @@ jobs:
                   if check:
                       record['outcome'] = 'checker_comment_' + check[2]
                       record['matches_head'] = head.startswith(check[1])
+                  else:
+                      terms = unknown_feedback_terms(comment['body'])
+                      if terms:
+                          record['terms'] = terms
               return record
           
           
