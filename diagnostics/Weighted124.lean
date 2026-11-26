@@ -1,0 +1,114 @@
+import PEqualNP.Defs
+namespace PEqualNP.Outside.L_meta_9743_Allocation
+open Finset
+abbrev P := Fin 21
+abbrev F := Fin 104
+def row : F → P := ![0, 0, 0, 0, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 6, 6, 6, 6, 6, 7, 7, 7, 7, 7, 8, 8, 8, 8, 8, 9, 9, 9, 9, 9, 10, 10, 10, 10, 10, 11, 11, 11, 11, 11, 12, 12, 12, 12, 12, 13, 13, 13, 13, 13, 14, 14, 14, 14, 14, 15, 15, 15, 15, 15, 16, 16, 16, 16, 16, 17, 17, 17, 17, 17, 18, 18, 18, 18, 18, 19, 19, 19, 19, 19, 20, 20, 20, 20, 20]
+def col : F → P := ![5, 7, 17, 20, 0, 1, 6, 8, 18, 1, 2, 7, 9, 19, 2, 3, 8, 10, 20, 0, 3, 4, 9, 11, 1, 4, 5, 10, 12, 2, 5, 6, 11, 13, 3, 6, 7, 12, 14, 4, 7, 8, 13, 15, 5, 8, 9, 14, 16, 6, 9, 10, 15, 17, 7, 10, 11, 16, 18, 8, 11, 12, 17, 19, 9, 12, 13, 18, 20, 0, 10, 13, 14, 19, 1, 11, 14, 15, 20, 0, 2, 12, 15, 16, 1, 3, 13, 16, 17, 2, 4, 14, 17, 18, 3, 5, 15, 18, 19, 4, 6, 16, 19, 20]
+def matched : P → F := ![0, 6, 11, 16, 22, 27, 32, 37, 42, 47, 52, 57, 62, 67, 73, 78, 79, 84, 89, 94, 99]
+def mcol (p : P) : P := ⟨(p.val+5)%21,by omega⟩
+theorem on_matching : ∀ p : P, row (matched p)=p ∧ col (matched p)=mcol p := by decide +kernel
+theorem mcol_inj : Function.Injective mcol := by
+  intro a b h
+  have z := congrArg Fin.val h
+  apply Fin.ext
+  dsimp [mcol] at z
+  omega
+
+abbrev Vertex := Sum P P
+def bucket {n k : Nat} (f : Fin n → Fin k) (j : Fin k) : Finset (Fin n) :=
+  univ.filter (fun i => f i=j)
+theorem bucket_sum {n k : Nat} (f : Fin n → Fin k) :
+    ∑ j : Fin k,(bucket f j).card=n := by
+  have eqn := Finset.card_eq_sum_card_fiberwise (s := (univ : Finset (Fin n)))
+    (t := (univ : Finset (Fin k))) (f := f) (fun i _ => mem_univ (f i))
+  simpa [bucket] using eqn.symm
+
+def endpoint (cover : Finset Vertex) (p : P) : Vertex :=
+  if Sum.inl p∈cover then Sum.inl p else Sum.inr (mcol p)
+
+theorem ep_inj (cover : Finset Vertex) : Function.Injective (endpoint cover) := by
+  intro a b h
+  by_cases ha : Sum.inl a∈cover <;> by_cases hb : Sum.inl b∈cover
+  · simpa [endpoint,ha,hb] using h
+  · simp [endpoint,ha,hb] at h
+  · simp [endpoint,ha,hb] at h
+  · exact mcol_inj (by simpa [endpoint,ha,hb] using h)
+
+theorem bucket_matching {k} (assign : F → Fin k) (j : Fin k) (cover : Finset Vertex)
+    (hits : ∀ e : F, assign e=j → Sum.inl (row e)∈cover ∨ Sum.inr (col e)∈cover) :
+    (bucket (assign ∘ matched) j).card≤cover.card := by
+  have sub : (bucket (assign ∘ matched) j).image (endpoint cover) ⊆ cover := by
+    intro z hz
+    obtain ⟨i,hi,rfl⟩ := mem_image.mp hz
+    have h : assign (matched i)=j := (mem_filter.mp hi).2
+    have t := hits (matched i) h
+    rw [(on_matching i).1,(on_matching i).2] at t
+    unfold endpoint
+    split <;> tauto
+  have done := card_le_card sub
+  rwa [card_image_of_injective _ (ep_inj cover)] at done
+
+-- Costs refer to the independent paid gates of each terminal. Their raw inputs
+-- and the edges they accept may overlap. Each true edge has one chosen owner.
+theorem allocated124 {k : Nat} (assign : F → Fin k) (cost : Fin k → Nat)
+    (cover : Fin k → Finset Vertex)
+    (tops : ∀ j e, assign e=j → Sum.inl (row e)∈cover j ∨ Sum.inr (col e)∈cover j)
+    (charge : ∀ j, (bucket assign j).card+(cover j).card≤cost j+1) :
+    124≤(∑ j,cost j)+(k-1) := by
+  have h (j : Fin k) :
+      (bucket assign j).card+(bucket (assign ∘ matched) j).card≤cost j+1 :=
+    (Nat.add_le_add_left (bucket_matching assign j (cover j) (tops j)) _).trans (charge j)
+  have total := Finset.sum_le_sum (s := (univ : Finset (Fin k))) (fun j _ => h j)
+  rw [Finset.sum_add_distrib,Finset.sum_add_distrib,
+    bucket_sum assign,bucket_sum (assign ∘ matched)] at total
+  simp at total
+  have pos : 0<k := by have z := (assign (0:F)).isLt; omega
+  omega
+
+def weight : F → Nat := ![16, 16, 16, 16, 16, 12, 12, 12, 12, 13, 13, 12, 13, 13, 13, 13, 13, 13, 12, 16, 12, 12, 12, 12, 13, 13, 12, 13, 13, 13, 12, 13, 13, 13, 13, 13, 12, 13, 13, 13, 12, 13, 13, 13, 12, 13, 13, 13, 13, 13, 13, 13, 13, 12, 12, 13, 13, 13, 13, 13, 13, 13, 12, 13, 13, 13, 13, 13, 12, 16, 12, 12, 12, 12, 13, 13, 13, 13, 12, 16, 12, 12, 12, 12, 13, 13, 13, 13, 12, 13, 13, 13, 12, 13, 13, 12, 13, 13, 13, 13, 13, 13, 13, 12]
+def atVertex (v : Vertex) (e : F) : Prop :=
+  Sum.inl (row e)=v ∨ Sum.inr (col e)=v
+instance (v : Vertex) (e : F) : Decidable (atVertex v e) := by unfold atVertex; infer_instance
+theorem all_mass : (∑ e : F, weight e)=1344 := by decide +kernel
+set_option maxRecDepth 10000 in
+theorem unit_mass : ∀ v : Vertex, (∑ e : F, if atVertex v e then weight e else 0)=64 := by decide +kernel
+
+def mass {k : Nat} (f : F → Fin k) (j : Fin k) := ∑ e∈bucket f j,weight e
+theorem mass_sum {k : Nat} (f : F → Fin k) : (∑ j,mass f j)=1344 := by
+  have h := Finset.sum_fiberwise_of_maps_to (s := (univ : Finset F))
+    (t := (univ : Finset (Fin k))) (g := f) (fun e _ => mem_univ (f e)) weight
+  exact h.trans all_mass
+
+theorem mass_cover {k : Nat} (f : F → Fin k) (j : Fin k) (cover : Finset Vertex)
+    (hit : ∀ e, f e=j → Sum.inl (row e)∈cover ∨ Sum.inr (col e)∈cover) :
+    mass f j≤64*cover.card := by
+  classical
+  have one (e : F) (he : e∈bucket f j) :
+      weight e≤∑ v∈cover, if atVertex v e then weight e else 0 := by
+    rcases hit e (mem_filter.mp he).2 with a|b
+    · have z := Finset.single_le_sum (f := fun v : Vertex => if atVertex v e then weight e else 0)
+        (fun v _ => Nat.zero_le _) a
+      simpa [atVertex] using z
+    · have z := Finset.single_le_sum (f := fun v : Vertex => if atVertex v e then weight e else 0)
+        (fun v _ => Nat.zero_le _) b
+      simpa [atVertex] using z
+  have local_sum (v : Vertex) : (∑ e∈bucket f j, if atVertex v e then weight e else 0)≤64 := by
+    rw [← unit_mass v]
+    exact Finset.sum_le_sum_of_subset_of_nonneg (subset_univ _) (fun _ _ _ => Nat.zero_le _)
+  calc
+    mass f j≤∑ e∈bucket f j,∑ v∈cover,if atVertex v e then weight e else 0 := sum_le_sum one
+    _ = ∑ v∈cover,∑ e∈bucket f j,if atVertex v e then weight e else 0 := Finset.sum_comm
+    _ ≤ ∑ _v∈cover,64 := Finset.sum_le_sum (fun v _ => local_sum v)
+    _ = 64*cover.card := by simp [Nat.mul_comm]
+
+theorem weighted124 {k : Nat} (f : F → Fin k) (cost : Fin k → Nat)
+    (charge : ∀ j,64*(bucket f j).card+mass f j≤64*(cost j+1)) :
+    124≤(∑ j,cost j)+(k-1) := by
+  have total := Finset.sum_le_sum (s := (univ : Finset (Fin k))) (fun j _ => charge j)
+  rw [Finset.sum_add_distrib,← Finset.mul_sum,← Finset.mul_sum,bucket_sum,mass_sum,
+    Finset.sum_add_distrib] at total
+  simp at total
+  omega
+
+end PEqualNP.Outside.L_meta_9743_Allocation
