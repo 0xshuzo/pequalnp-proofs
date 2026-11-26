@@ -2,7 +2,7 @@ name: Lean proof diagnostics
 on:
   push:
     branches:
-      - pnp/diagnostics-2ba6f8fb
+      - pnp-construction-compiler
 permissions: {}
 jobs:
   build:
@@ -13,9 +13,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - module: L_meta_3551
-            head: 58c4f5c36977d802c921c85a1a50e7618d171253
-            base: 22841cc792d020bb28a10ea5371570a26c462003
+          - module: L_meta_9298
+            head: 4592c7946eaac5e876e614dc80543dad57efc066
+            base: 33f667422a2deebb87e9826f0bc326286b03df5f
     env:
       PROOF_HEAD: ${{ matrix.head }}
       BASE_HEAD: ${{ matrix.base }}
