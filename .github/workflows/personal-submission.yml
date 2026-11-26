@@ -1006,7 +1006,7 @@ jobs:
                       submit(CANDIDATE)
           
           
-          CANDIDATE = {'advisory': {'task': 'L-meta-22598', 'leased_task': 'L-meta-22598', 'proof': '6a4ff34a1adf59ba1255dbeb3f56012ab85d9d29', 'head_ref': 'pnp/l-meta-22598-g1795716219', 'base_pr': 145, 'advisory_pr': 146, 'base_ref': 'pnp-base-95fd09147af0', 'base_sha': '95fd09147af03601843592733e5abcc0c3ba71e6', 'advisory_ref': 'pnp-advisory-95fd09147af0-own-pr', 'advisory_sha': '51977f448985d12ead9f40cdb5e1dc1fa07b4f60'}, 'task': 'L-meta-22598', 'defer_competing_table': False, 'leased_task': 'L-meta-22598', 'file': 'lean/PEqualNP/Outside/L_meta_22598.lean', 'branch': 'pnp/l-meta-22598-g1795716219', 'kind': 'check', 'run': '45872985885', 'ci_sha': '6a4ff34a1adf59ba1255dbeb3f56012ab85d9d29', 'desk_prs': [30433], 'sha': '6a4ff34a1adf59ba1255dbeb3f56012ab85d9d29', 'base': '95fd09147af03601843592733e5abcc0c3ba71e6', 'blob': 'eb08ab1ad107bd80527bedb7b8bb98f0df122a17', 'statement': '85fe0d37a85d3dcea0e18f6aef94c66b6bd0ce1633617bc7dc05de060f0a326a', 'until': 1795716704}
+          CANDIDATE = {'cleanup_refs': 1, 'cleanup_branches': ['pnp/verify-lemmas-6d729830ba46', 'pnp/verify-lemmas-6dc30c0750b7', 'pnp/verify-lemmas-6dd1f20c9e94', 'pnp/verify-lemmas-6e242ca75086', 'pnp/verify-lemmas-6e80b6f41f5d', 'pnp/verify-lemmas-6eafe9780bec']}
           
           if __name__ == '__main__':
               main()
