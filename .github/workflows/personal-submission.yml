@@ -343,6 +343,7 @@ jobs:
           FORK_API = 'repos/' + FORK + '/'
           UPSTREAM_API = 'repos/' + UPSTREAM + '/'
           HELD = {'L-meta-3128', 'L-meta-3055', 'L-meta-3154', 'L-meta-3186'}
+          HISTORICAL_HOLDS = HELD | {'L-meta-3921', 'L-meta-4373', 'L-meta-4399', 'L-meta-4524', 'L-meta-4889', 'L-meta-4980'}
           
           
           def require(condition, message):
@@ -355,13 +356,49 @@ jobs:
                                     stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=90)
           
           
+          def audit_limit(message, headers=''):
+              # Emit only allowlisted response metadata. Never print the full header block.
+              fields = dict((k.lower(), v.strip()) for line in headers.splitlines()
+                            if ':' in line for k, _, v in [line.partition(':')])
+              status = headers.splitlines()[0] if headers else ''
+              limited = ('rate limit' in message.lower() or 'HTTP 429' in message or
+                         re.match(r'HTTP/\S+ 429\b', status) or
+                         (re.match(r'HTTP/\S+ 403\b', status) and
+                          (fields.get('x-ratelimit-remaining') == '0' or 'retry-after' in fields)))
+              if not limited:
+                  return
+              retry = fields.get('retry-after', '')
+              reset = fields.get('x-ratelimit-reset', '')
+              times = []
+              if retry.isdecimal():
+                  times.append(int(time.time()) + int(retry))
+              elif retry:
+                  from email.utils import parsedate_to_datetime
+                  try:
+                      times.append(int(parsedate_to_datetime(retry).timestamp()))
+                  except (TypeError, ValueError, OverflowError):
+                      pass
+              if fields.get('x-ratelimit-remaining') == '0' and reset.isdecimal():
+                  times.append(int(reset))
+              resource = fields.get('x-ratelimit-resource')
+              print('AUDIT_RATE_LIMIT', json.dumps({'resource':resource if resource in
+                    ('core','search','graphql') else None, 'retry_at':max(times,default=None)}), flush=True)
+              raise SystemExit('GitHub API rate limit during personal audit')
+          
+          
           def api(path):
               for delay in (0, 2, 6):
                   if delay:
                       time.sleep(delay)
-                  result = gh('api', '--hostname', 'github.com', path, check=False)
+                  audited = 'audit' in globals().get('CANDIDATE', {})
+                  result = gh('api', '--hostname', 'github.com', *(['--include'] if audited else []), path, check=False)
+                  header, body = '', result.stdout
+                  if audited and body.startswith('HTTP/'):
+                      header, _, body = body.partition('\n\n')
                   if result.returncode == 0:
-                      return json.loads(result.stdout)
+                      return json.loads(body)
+                  if audited:
+                      audit_limit(result.stderr, header)
                   if not re.search(r'HTTP (502|503|504)\b', result.stderr):
                       break
               raise SystemExit(result.stderr.strip() or 'GitHub API failed')
@@ -763,7 +800,10 @@ jobs:
               unchanged = set()
               if cached_heads:
                   snapshot = gh('pr','list','--repo',UPSTREAM,'--author','0xshuzo','--state','closed',
-                                '--limit','1000','--json','number,headRefOid,updatedAt')
+                                '--limit','1000','--json','number,headRefOid,updatedAt',check=False)
+                  if snapshot.returncode:
+                      audit_limit(snapshot.stderr)
+                      raise SystemExit(snapshot.stderr.strip() or 'Closed PR snapshot failed')
                   for record in json.loads(snapshot.stdout):
                       n = record['number']
                       if (cached_heads.get(str(n)) == record['headRefOid'] and
@@ -818,6 +858,7 @@ jobs:
                                                env=gh_env,capture_output=True,timeout=60)
                       observed['log_request'] = request.returncode
                       if request.returncode:
+                          audit_limit(request.stderr.decode('utf-8','replace'))
                           continue
                       try:
                           with zipfile.ZipFile(io.BytesIO(request.stdout)) as archive:
@@ -847,7 +888,9 @@ jobs:
                         'merged':bool(pr.get('merged_at')),'merged_at':pr.get('merged_at'),
                         'verdict':verdict,'run':run_id,'comments':len(comments),'evidence':observed}),
                         flush=True)
-              for gid in sorted(HELD | {'L-meta-3921', 'L-meta-4373', 'L-meta-4399', 'L-meta-4524', 'L-meta-4889', 'L-meta-4980'}):
+              selected = HISTORICAL_HOLDS if CANDIDATE.get('refresh_holds') else set(CANDIDATE.get('active_holds', ()))
+              require(selected <= HISTORICAL_HOLDS, 'Unexpected historical hold')
+              for gid in sorted(selected):
                   _, others = current_prs({'task':gid,'branch':gid})
                   live = sorted(p['number'] for p in others if p['state']=='open' and p['user']['login']!='0xshuzo')
                   print('HELD_COMPETITION',gid,','.join(map(str,live)),flush=True)
@@ -1166,7 +1209,7 @@ jobs:
                       submit(CANDIDATE)
           
           
-          CANDIDATE = {}
+          CANDIDATE = {'advisory': {'task': 'L-meta-27565', 'leased_task': 'L-meta-27565', 'proof': 'b2c3940cd179d0241e95d3c10b1ddef5e118eff2', 'head_ref': 'pnp/l-meta-27565-g1795801074', 'base_pr': 249, 'advisory_pr': 250, 'base_ref': 'pnp-base-08537c04b6f0', 'base_sha': '08537c04b6f00e3619400f77cc4531411449d2cd', 'advisory_ref': 'pnp-advisory-08537c04b6f0-own-pr', 'advisory_sha': '4c9e9b4b8d93b1bbf1fd522d105d746116339945'}, 'task': 'L-meta-27565', 'defer_competing_table': False, 'leased_task': 'L-meta-27565', 'file': 'lean/PEqualNP/Outside/L_meta_27565.lean', 'branch': 'pnp/l-meta-27565-g1795801074', 'kind': 'check', 'run': '46043408609', 'ci_sha': 'b2c3940cd179d0241e95d3c10b1ddef5e118eff2', 'desk_prs': [41076], 'sha': 'b2c3940cd179d0241e95d3c10b1ddef5e118eff2', 'base': '08537c04b6f00e3619400f77cc4531411449d2cd', 'blob': 'f676c0f336f459b46d7dde360c5c9e8ad050cd92', 'statement': '36826208c5ee0683e463221c52edc85150b450f2156e67568e14c686f8ae1626', 'until': 1795802118}
           
           if __name__ == '__main__':
               main()
