@@ -1209,7 +1209,7 @@ jobs:
                       submit(CANDIDATE)
           
           
-          CANDIDATE = {'cleanup_refs': 1, 'standard_heads': {'pnp-base-dac733d8f280': 'dac733d8f28095f16367753386632413611fb7ba', 'pnp-base-e103093409e4': 'e103093409e486f0ec347b3092a5ebfa7e644f05', 'pnp-base-e4d5876ed81d': 'e4d5876ed81d38a2be5e650c709b7c45e1fc0c59', 'pnp-base-f50231250e70': 'f50231250e70919e98c9cf987dca65d77896c9cc'}}
+          CANDIDATE = {'advisory': {'task': 'L-lib-865', 'leased_task': 'L-lib-865', 'proof': '62d035d8fc048df819ba438f6072cf178893dc96', 'head_ref': 'pnp/l-lib-865-g1795803061', 'base_pr': 259, 'advisory_pr': 260, 'base_ref': 'pnp-base-b9a9ac31193a', 'base_sha': 'b9a9ac31193a990f5cdd3bee5a416d8a7b216599', 'advisory_ref': 'pnp-advisory-b9a9ac31193a-own-pr', 'advisory_sha': 'fd451ffd0611aa79ef8c217a223df9505656927c'}, 'task': 'L-lib-865', 'defer_competing_table': False, 'leased_task': 'L-lib-865', 'file': 'lean/PEqualNP/Outside/L_lib_865.lean', 'branch': 'pnp/l-lib-865-g1795803061', 'kind': 'check', 'run': '46050233741', 'ci_sha': '62d035d8fc048df819ba438f6072cf178893dc96', 'desk_prs': [42667], 'sha': '62d035d8fc048df819ba438f6072cf178893dc96', 'base': 'b9a9ac31193a990f5cdd3bee5a416d8a7b216599', 'blob': '1940762d97b07603e53bbce2cfe7a6b2f5c13654', 'statement': 'e98e9a1e58ddc710755169d6e992eb0ecca607e8b910e89900db3f854d85fe9d', 'until': 1795804829}
           
           if __name__ == '__main__':
               main()
