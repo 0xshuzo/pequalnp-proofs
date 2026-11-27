@@ -1,0 +1,54 @@
+name: Verify auxiliary Lean lemmas
+on:
+  push:
+    branches: [pnp/verify-lemmas-b09f749e1a93]
+permissions: {}
+jobs:
+  compile:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 32
+    steps:
+      - name: Fetch pinned sources
+        run: |
+          set -eu
+          git init -q .
+          git fetch -q --depth=1 --no-tags https://github.com/0xshuzo/pequalnp-proofs.git "$GITHUB_SHA"
+          git checkout -q --detach FETCH_HEAD
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+      - name: Install Lean and Mathlib
+        working-directory: lean
+        run: |
+          set -eu
+          curl -fsSL https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh | sh -s -- -y --default-toolchain none
+          export PATH="$HOME/.elan/bin:$PATH"
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+          elan toolchain install "$(cat lean-toolchain)"
+          lake exe cache get
+          lake build +PEqualNP.Defs
+      - name: Check Seal.lean
+        if: success() || failure()
+        working-directory: lean
+        run: |
+          if test -x /usr/bin/time; then
+            lake env /usr/bin/time -f 'LEAN_RESOURCE Seal.lean wall_seconds=%e peak_rss_kib=%M' lean ../diagnostics/Seal.lean
+          else
+            lake env lean ../diagnostics/Seal.lean
+          fi
+      - name: Check PhysicalRows.lean
+        if: success() || failure()
+        working-directory: lean
+        run: |
+          if test -x /usr/bin/time; then
+            lake env /usr/bin/time -f 'LEAN_RESOURCE PhysicalRows.lean wall_seconds=%e peak_rss_kib=%M' lean ../diagnostics/PhysicalRows.lean
+          else
+            lake env lean ../diagnostics/PhysicalRows.lean
+          fi
+      - name: Check RectCost18180.lean
+        if: success() || failure()
+        working-directory: lean
+        run: |
+          if test -x /usr/bin/time; then
+            lake env /usr/bin/time -f 'LEAN_RESOURCE RectCost18180.lean wall_seconds=%e peak_rss_kib=%M' lean ../diagnostics/RectCost18180.lean
+          else
+            lake env lean ../diagnostics/RectCost18180.lean
+          fi
