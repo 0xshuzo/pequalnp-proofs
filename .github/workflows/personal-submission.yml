@@ -1166,7 +1166,7 @@ jobs:
                       submit(CANDIDATE)
           
           
-          CANDIDATE = {'cleanup_refs': 1, 'cleanup_branches': ['pnp/check-l-meta-4081-ee36b055c5', 'pnp/check-l-meta-4095-a28fad7f4f']}
+          CANDIDATE = {'cleanup_refs': 1, 'standard_heads': {'pnp-base-2dd394afd162': '2dd394afd162445fc3137b23c9fdb015709db1fb', 'pnp-base-3305ac40ebd2': '3305ac40ebd2b90d543e9a67eaecc8a594a8175e', 'pnp-base-37905a208004': '37905a2080040e409f4a695cbc96dc6c913791b9', 'pnp-base-39eef67dc34d': '39eef67dc34d916766c6513bb2fade295f8b1f52'}}
           
           if __name__ == '__main__':
               main()
