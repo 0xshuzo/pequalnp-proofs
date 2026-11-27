@@ -1209,7 +1209,7 @@ jobs:
                       submit(CANDIDATE)
           
           
-          CANDIDATE = {'advisory': {'task': 'L-lib-592', 'leased_task': 'L-lib-592', 'proof': 'a18d13fadcaae8e9323f3433e4420c0572b7e1d0', 'head_ref': 'pnp/l-lib-592-g1795800184', 'base_pr': 245, 'advisory_pr': 246, 'base_ref': 'pnp-base-b001f326e140', 'base_sha': 'b001f326e1404bf59e63427d3716ac5d00eb3b56', 'advisory_ref': 'pnp-advisory-b001f326e140-own-pr', 'advisory_sha': '829e1905f757474d2a87911f285c1b3910fb3a64'}, 'task': 'L-lib-592', 'defer_competing_table': False, 'leased_task': 'L-lib-592', 'file': 'lean/PEqualNP/Outside/L_lib_592.lean', 'branch': 'pnp/l-lib-592-g1795800184', 'kind': 'check', 'run': '46043003518', 'ci_sha': 'a18d13fadcaae8e9323f3433e4420c0572b7e1d0', 'desk_prs': [], 'sha': 'a18d13fadcaae8e9323f3433e4420c0572b7e1d0', 'base': 'b001f326e1404bf59e63427d3716ac5d00eb3b56', 'blob': '400944d99aa4fefd4e19215bfba58f045476f3f0', 'statement': '299c1c1ab58493bd437eb4b4cf81d5d6e92481b8e53e622212ef83de0ef7f652', 'until': 1795802162}
+          CANDIDATE = {'cleanup_refs': 1, 'cleanup_branches': ['pnp/check-l-meta-2346-ae79761641', 'pnp/check-l-meta-2346-ae97cd9e2b']}
           
           if __name__ == '__main__':
               main()
