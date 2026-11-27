@@ -13,9 +13,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - module: L_meta_30642
-            head: c60cca8e4224b1c280fd459743ced546bd8770cf
-            base: 2211ead9d40f66c43faf096fd06039bc305a15b8
+          - module: L_pcx_363
+            head: 18fa9d59b28500ad1cef7c50536702a8606a8c3b
+            base: ef8c29eaf83107c5bb4c88dc385d9f5614278bf6
     env:
       PROOF_HEAD: ${{ matrix.head }}
       BASE_HEAD: ${{ matrix.base }}
