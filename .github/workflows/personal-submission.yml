@@ -1209,7 +1209,7 @@ jobs:
                       submit(CANDIDATE)
           
           
-          CANDIDATE = {'advisory': {'task': 'L-lib-851', 'leased_task': 'L-lib-851', 'proof': '9f82b9678044f1b3e23390da2854f46e4e7d7a26', 'head_ref': 'pnp/l-lib-851-g1795802083', 'base_pr': 257, 'advisory_pr': 258, 'base_ref': 'pnp-base-e4d5876ed81d', 'base_sha': 'e4d5876ed81d38a2be5e650c709b7c45e1fc0c59', 'advisory_ref': 'pnp-advisory-e4d5876ed81d-own-pr', 'advisory_sha': 'da861dbecc6051805336113f17b9fdfe2379b055'}, 'task': 'L-lib-851', 'defer_competing_table': False, 'leased_task': 'L-lib-851', 'file': 'lean/PEqualNP/Outside/L_lib_851.lean', 'branch': 'pnp/l-lib-851-g1795802083', 'kind': 'check', 'run': '46048751820', 'ci_sha': '9f82b9678044f1b3e23390da2854f46e4e7d7a26', 'desk_prs': [], 'sha': '9f82b9678044f1b3e23390da2854f46e4e7d7a26', 'base': 'e4d5876ed81d38a2be5e650c709b7c45e1fc0c59', 'blob': '0fa7bf6296192abac3d83c8b56ac674e7087db57', 'statement': '4424edaa611317baf9e4e52122903f13abe9ce1c6bb9b7940df6678e44fc5ea4', 'until': 1795804111}
+          CANDIDATE = {'cleanup_refs': 1, 'cleanup_branches': ['pnp/verify-lemmas-8fc583f6382b', 'pnp/verify-lemmas-8fec649a5bb2', 'pnp/verify-lemmas-8fee029b3c1b', 'pnp/verify-lemmas-8ff6ed10f1ff', 'pnp/verify-lemmas-9012dd494c9c', 'pnp/verify-lemmas-9028ab069ecb']}
           
           if __name__ == '__main__':
               main()
