@@ -5,33 +5,26 @@
 # counts comes from authoritative.yml, which runs from the base branch only.
 name: advisory
 
-# NOT RUN ON PULL REQUESTS (26 Nov 2026). For a pull request from outside this run always waited for an
-# approval that is never given (nobody approves a run of an outside pull request), so it never ran and read
-# as a queue of waiting work. The verdict that counts was always authoritative.yml, which the intake starts
-# for every pull request. This file is kept, and can be started by hand for one pull request number.
+# Fork advisory for internal proof branches.
 on:
-  workflow_dispatch:
-    inputs:
-      pr:
-        description: "pull request number"
-        required: true
-        type: string
+  pull_request:
+    branches: ['pnp-advisory-7be2e29f26dc-own-pr']
 
 # Least privilege: read the code, nothing else. No credentials are used anywhere in this file.
-permissions:
-  contents: read
+permissions: {}
 
 concurrency:
-  group: advisory-${{ inputs.pr }}
+  group: advisory-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
 jobs:
   check:
+    if: github.repository == '0xshuzo/pequalnp-proofs' && github.event.pull_request.head.repo.id == github.event.repository.id && github.event.pull_request.base.repo.id == github.event.repository.id
     runs-on: ubuntu-24.04
     timeout-minutes: 120
     env:
       # Values from the event go through env and a strict pattern, never into a script as text.
-      PR: ${{ inputs.pr }}
+      PR: ${{ github.event.pull_request.number }}
       # The desk's row for the one gap, by id: the same address as authoritative.yml (a test keeps them equal).
       ROW_URL: https://pequalnp-desk.pequalnp.workers.dev/desk/row?gap=
       # THE PINNED ELAN, the same two values as authoritative.yml (a test keeps them equal). To bump: change
@@ -39,14 +32,29 @@ jobs:
       ELAN_VERSION: v4.4.0
       ELAN_SHA256: 0e8250aa2be86c7af929ade68db617af9edc8b9ccf6eaf5ece228250d0d032e2
     steps:
-      # THE FIRST STEP ALWAYS STOPS (red team term, 26 Nov 2026). Started by hand this job would fetch a numbered
-      # pull request and run the toolchain and the checker on it in THIS repository's context, which for an outside
-      # pull request is the same act as approving its run. So nothing below runs until this step is replaced by one
-      # that refuses, in code, any pull request whose head is not this repository.
-      - name: Not run
+      - name: Confirm the proof comes from this fork
         run: |
-          echo "advisory is not run. The verdict that counts is authoritative.yml, which the intake starts."
-          exit 1
+          set -eu
+          python3 - <<'PY'
+          import json, os, re
+          from pathlib import Path
+          event = json.loads(Path(os.environ['GITHUB_EVENT_PATH']).read_text())
+          repo = event['repository']
+          pr = event['pull_request']
+          if os.environ['GITHUB_EVENT_NAME'] != 'pull_request' or repo['full_name'] != '0xshuzo/pequalnp-proofs':
+              raise SystemExit('Unexpected repository or event')
+          for side in ('base', 'head'):
+              branch = pr[side]
+              if branch['repo']['id'] != repo['id'] or branch['repo']['full_name'] != repo['full_name']:
+                  raise SystemExit('External proof PR')
+              if not re.fullmatch('[0-9a-f]{40}', branch['sha']):
+                  raise SystemExit('Unexpected PR SHA')
+          if pr['base']['ref'] != 'pnp-advisory-7be2e29f26dc-own-pr' or not pr['head']['ref'].startswith('pnp/'):
+              raise SystemExit('Unexpected proof branches')
+          with open(os.environ['GITHUB_ENV'], 'a') as out:
+              print('EXPECTED_BASE_SHA=' + pr['base']['sha'], file=out)
+              print('EXPECTED_PROOF_SHA=' + pr['head']['sha'], file=out)
+          PY
       - name: Fetch the pull request (plain git, no stored credentials)
         run: |
           set -eu
@@ -55,6 +63,9 @@ jobs:
           # The merge result of the pull request, with its two sides (depth 2).
           git fetch -q --depth 2 "https://github.com/${GITHUB_REPOSITORY}.git" "refs/pull/${PR}/merge"
           git checkout -q --detach FETCH_HEAD
+          test "$(git rev-parse HEAD^1)" = "$EXPECTED_BASE_SHA"
+          test "$(git rev-parse HEAD^2)" = "$EXPECTED_PROOF_SHA"
+          echo "Checked out the exact fork proof $EXPECTED_PROOF_SHA"
 
       - name: The pull request must add exactly one proof file
         id: one
