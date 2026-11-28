@@ -1240,7 +1240,7 @@ jobs:
                       submit(CANDIDATE)
           
           
-          CANDIDATE = {'cleanup_refs': 1, 'standard_heads': {'pnp-base-7be2e29f26dc': '7be2e29f26dc4f0c7c5ca54bdf7c89f2b0be9a5e', 'pnp-base-9ca8c23a8b4f': '9ca8c23a8b4fcb26231cc4a8f19f0702e9997263', 'pnp-base-ae88a5fd9def': 'ae88a5fd9def9a89d5b18870b367d3dbb0b19908', 'pnp-base-b25d97d64015': 'b25d97d6401567af7fd0e5b051f8bb7359e85891'}}
+          CANDIDATE = {'advisory': {'task': 'L-meta-51746', 'leased_task': 'L-meta-51746', 'proof': 'bf2dd5b5069ef530b580a56fc9c13844a9360ff2', 'head_ref': 'pnp/l-meta-51746-g1795866039', 'base_pr': 341, 'advisory_pr': 342, 'base_ref': 'pnp-base-4fc4c23fd573', 'base_sha': '4fc4c23fd573f2608ea14231a20395b3862fd287', 'advisory_ref': 'pnp-advisory-4fc4c23fd573-own-pr', 'advisory_sha': '52914263c21dbe7e45a7854070d6a289fb1f2d96'}, 'task': 'L-meta-51746', 'defer_competing_table': False, 'leased_task': 'L-meta-51746', 'file': 'lean/PEqualNP/Outside/L_meta_51746.lean', 'branch': 'pnp/l-meta-51746-g1795866039', 'kind': 'check', 'run': '46141287350', 'ci_sha': 'bf2dd5b5069ef530b580a56fc9c13844a9360ff2', 'desk_prs': [], 'sha': 'bf2dd5b5069ef530b580a56fc9c13844a9360ff2', 'base': '4fc4c23fd573f2608ea14231a20395b3862fd287', 'blob': 'c0e16d3a245b11ac30ef3eac4911da3c52abf031', 'statement': 'b48f682c30ab4674357d02544007c538cd55411affb3ad5a3c8999b23ed6a566', 'until': 1795867742}
           
           if __name__ == '__main__':
               main()
