@@ -1209,7 +1209,7 @@ jobs:
                       submit(CANDIDATE)
           
           
-          CANDIDATE = {'inspect_tables': [{'step': 'L-meta-41722', 'prs': []}]}
+          CANDIDATE = {'advisory': {'task': 'L-meta-41722', 'leased_task': 'L-meta-41722', 'proof': 'd19e2a039b58242e0a2a99051ff3c30d8847d328', 'head_ref': 'pnp/l-meta-41722-g1795847815', 'base_pr': 313, 'advisory_pr': 314, 'base_ref': 'pnp-base-f56757f7e39b', 'base_sha': 'f56757f7e39b1b30c1c68737a0584b8a88a62e03', 'advisory_ref': 'pnp-advisory-f56757f7e39b-own-pr', 'advisory_sha': 'c117e1869944ec52039f853f2d4f968caca6f3ae'}, 'task': 'L-meta-41722', 'defer_competing_table': True, 'leased_task': 'L-meta-41722', 'file': 'lean/PEqualNP/Outside/L_meta_41722.lean', 'branch': 'pnp/l-meta-41722-g1795847815', 'kind': 'check', 'run': '46117988387', 'ci_sha': 'd19e2a039b58242e0a2a99051ff3c30d8847d328', 'desk_prs': [], 'sha': 'd19e2a039b58242e0a2a99051ff3c30d8847d328', 'base': 'f56757f7e39b1b30c1c68737a0584b8a88a62e03', 'blob': 'a4bbb91f16002d3741e438db0b3b49418a8e2702', 'statement': '4f5ef652976b7cbeea0bdb822d76e76634ffe2f07981c918f75b3f7d380605ee', 'until': 1795849779}
           
           if __name__ == '__main__':
               main()
