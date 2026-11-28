@@ -14,7 +14,7 @@ jobs:
       matrix:
         include:
           - module: L_meta_35106
-            head: 26132cf3767030a25c8904eac1465f6a536100ba
+            head: c3053624a698d1ec86bddaed91ed3992e2e9ce27
             base: f3980e3be9d3ec88a9bdd06b2988309eef3b900b
     env:
       PROOF_HEAD: ${{ matrix.head }}
