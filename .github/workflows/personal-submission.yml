@@ -1209,7 +1209,7 @@ jobs:
                       submit(CANDIDATE)
           
           
-          CANDIDATE = {'cleanup_refs': 1, 'standard_heads': {'pnp-advisory-d603758dfd2c-own-pr': '1d1f656bb61e4fcc90293b6984175981bfdc91bc', 'pnp-advisory-ef8c29eaf831-own-pr': '658c39e086a4d17105a677c237d30286fc7cb35a', 'pnp-advisory-f3255b5fb19f-own-pr': '8452725058e1a1e98ae1f64de25ca2ed58b12ce0', 'pnp-advisory-f50231250e70-own-pr': '0a89b2ccc9b03f498e3a8ddadd812dfbfe1d9e70'}}
+          CANDIDATE = {'advisory': {'task': 'L-meta-35030', 'leased_task': 'L-meta-35030', 'proof': '19554ad3ae7c74a22056eac52c2fa37919fbca6a', 'head_ref': 'pnp/l-meta-35030-g1795834042', 'base_pr': 299, 'advisory_pr': 300, 'base_ref': 'pnp-base-83e81d845a6d', 'base_sha': '83e81d845a6d4b0cb2a0605526887f17cdbaff01', 'advisory_ref': 'pnp-advisory-83e81d845a6d-own-pr', 'advisory_sha': '2842b4d8bee7e228e9b39085ecb73b951fe9f3c8'}, 'task': 'L-meta-35030', 'defer_competing_table': False, 'leased_task': 'L-meta-35030', 'file': 'lean/PEqualNP/Outside/L_meta_35030.lean', 'branch': 'pnp/l-meta-35030-g1795834042', 'kind': 'check', 'run': '46104292002', 'ci_sha': '19554ad3ae7c74a22056eac52c2fa37919fbca6a', 'desk_prs': [], 'sha': '19554ad3ae7c74a22056eac52c2fa37919fbca6a', 'base': '83e81d845a6d4b0cb2a0605526887f17cdbaff01', 'blob': '42024857c79b4da08d544a6291e6f54f0013be41', 'statement': 'f88210753c2335ce6aa5a829adda8264576c66628e812303ecb1a2008153236f', 'until': 1795838978}
           
           if __name__ == '__main__':
               main()
