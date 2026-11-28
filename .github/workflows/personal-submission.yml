@@ -1209,7 +1209,7 @@ jobs:
                       submit(CANDIDATE)
           
           
-          CANDIDATE = {'inspect_tables': [{'step': 'L-meta-43634', 'prs': []}]}
+          CANDIDATE = {'cleanup_refs': 1, 'cleanup_branches': ['pnp/verify-lemmas-9c7adab9e8b1', 'pnp/verify-lemmas-9c9a1027294e', 'pnp/verify-lemmas-9ca29a3c9438', 'pnp/verify-lemmas-9ce0b99a60f3', 'pnp/verify-lemmas-9ceac294db0f', 'pnp/verify-lemmas-9d0038d38bd2']}
           
           if __name__ == '__main__':
               main()
